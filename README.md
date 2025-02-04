@@ -24,7 +24,7 @@
 
 ## Листинг кода
 ### Алгоритм ЦДА
-```
+```rust
 pub fn dda_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<(Pixel, Pixel)>> {
     let length = (end.x - start.x).abs().max((end.y - start.y).abs());
     let dx = (end.x - start.x) / length;
@@ -100,8 +100,8 @@ pub fn dda_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<
 Параболу можно построить с использованием пошагового метода, основанного на квадратном уравнении. Применяются аналогичные методы, как и для гиперболы, с учетом особенностей кривизны.
 
 ## Листинг кода
-### Алгоритм ЦДА
-```
+### Алгоритм отрисовки окружности
+```rust
 pub fn paint_circle(
     start: egui::Pos2,
     end: egui::Pos2,

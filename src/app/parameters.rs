@@ -93,7 +93,6 @@ impl Default for ExecutionControl {
 }
 
 pub struct ViewportSettings {
-    pub offset: egui::Vec2,
     pub debug_scale: f32,
     pub scroll_offset: egui::Vec2,
 }
@@ -101,7 +100,6 @@ pub struct ViewportSettings {
 impl Default for ViewportSettings {
     fn default() -> Self {
         Self {
-            offset: egui::Vec2::default(),
             debug_scale: 10.0,
             scroll_offset: egui::Vec2::new(0.0, 0.0),
         }

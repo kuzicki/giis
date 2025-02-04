@@ -11,7 +11,6 @@ pub fn paint_circle(
     let mut d = 2 - 2 * r;
 
     let (x_offset, y_offset) = (start.x.min(end.x), start.y.min(end.y));
-    //self.viewport.offset = egui::Vec2::new(x_offset, y_offset);
 
     let func_iter = std::iter::from_fn(move || {
         if x <= y {
@@ -85,7 +84,6 @@ pub fn paint_ellips(
     let mut d1 = (b * b) - (a * a * b) + (0.25 * a * a);
     let mut region1 = true;
     let (x_offset, y_offset) = (center.x, center.y);
-    // self.viewport.offset = egui::Vec2::new(x_offset, y_offset);
     let mut d2 = 0.0;
     let func_iter = std::iter::from_fn(move || {
         if region1 {
@@ -126,16 +124,14 @@ pub fn paint_hyperbola(
     b: f32,
     max_iterations: u32,
 ) -> impl Iterator<Item = Vec<(Pixel, Pixel)>> {
-    let (cx, cy) = (center.x, center.y);
     let a_sq = (a * a) as i32;
     let b_sq = (b * b) as i32;
     let mut x = a as i32;
     let mut y = 0i32;
     let mut iteration = 0;
-    let x_off = cx - max_iterations as f32 - a * 2.0;
-    let y_off = cy - max_iterations as f32;
+    let x_off = center.x - max_iterations as f32 - a * 2.0;
+    let y_off = center.y - max_iterations as f32;
 
-    // Decision parameter for region 1
     let mut d1 = b_sq * (x * x - (x - 1) * (x - 1)) - a_sq * (y * y);
 
     let mut region1 = true;
@@ -149,7 +145,6 @@ pub fn paint_hyperbola(
         let (old_x, old_y) = (x, y);
 
         if region1 {
-            // Region 1: Steep part
             if d1 < 0 {
                 d1 += 2 * b_sq * (x + 1);
             } else {
@@ -158,12 +153,10 @@ pub fn paint_hyperbola(
             }
             x += 1;
 
-            // Transition condition
             if b_sq * x > a_sq * y {
                 region1 = false;
             }
         } else {
-            // Region 2: Gentle slope
             let d2 = b_sq * (x + 1) * (x + 1) - a_sq * (y + 1) * (y + 1) - a_sq * b_sq;
 
             if d2 < 0 {
@@ -195,14 +188,9 @@ pub fn paint_parabola(
     let mut y = 0i32;
     let mut iteration = 0;
 
-    // let first_par = max_iterations as f32;
-    // let offset = distance_parabola(first_par, p);
-    // println!("Calculated offset: {offset}, first: {first_par}, p: {p}");
     let x_off = cx - max_iterations as f32;
     let y_off = cy - max_iterations as f32;
-    // let offset = 100.0;
 
-    // Decision parameter
     let mut d1 = 1 - 2 * p_int;
 
     let mut region1 = true;
@@ -216,7 +204,6 @@ pub fn paint_parabola(
         let (old_x, old_y) = (x, y);
 
         if region1 {
-            // Region 1: Steep slope (increment x)
             if d1 < 0 {
                 d1 += 2 * x + 3;
             } else {
@@ -225,12 +212,10 @@ pub fn paint_parabola(
             }
             x += 1;
 
-            // Transition to region 2
             if x >= 2 * p_int {
                 region1 = false;
             }
         } else {
-            // Region 2: Gentle slope (increment y)
             let d2 = (y + 1) * (y + 1) - 4 * p_int * (x + 1);
             if d2 < 0 {
                 x += 1;
@@ -248,19 +233,6 @@ pub fn paint_parabola(
             y_off,
         ))
     })
-}
-
-fn distance_parabola(x: f32, p: f32) -> f32 {
-    let y = (x * x) / (4.0 * p);
-    (x * x + y * y).sqrt()
-}
-
-fn distance_hyperbola(x: f32, a: f32, b: f32) -> Option<f32> {
-    if x.abs() < a {
-        return None; // Hyperbola is undefined for |x| < a
-    }
-    let y = b * ((x * x) / (a * a) - 1.0).sqrt();
-    Some((x * x + y * y).sqrt())
 }
 
 fn quadrant_sym(

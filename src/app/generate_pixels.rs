@@ -30,11 +30,11 @@ impl GeneratePixels for figure_parameters::Line {
         } = self
         {
             match line_type {
-                LineType::First => Box::new(lines::first(*start, *end))
+                LineType::First => Box::new(lines::dda_line(*start, *end))
                     as Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>>,
-                LineType::Second => Box::new(lines::second(*start, *end))
+                LineType::Second => Box::new(lines::bresenham_line(*start, *end))
                     as Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>>,
-                LineType::Third => Box::new(lines::third(*start, *end))
+                LineType::Third => Box::new(lines::wu_line(*start, *end))
                     as Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>>,
             }
         } else {

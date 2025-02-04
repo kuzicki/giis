@@ -1,4 +1,3 @@
-use crate::pixel::Pixel;
 use eframe::egui;
 mod click_action;
 mod debug_window;
@@ -6,7 +5,6 @@ mod generate_pixels;
 mod parameter_dialog;
 mod parameters;
 use click_action::ClickAction;
-use figure_parameters::LineType;
 use generate_pixels::GeneratePixels;
 use parameter_dialog::FigureParameters;
 use parameters::*;
@@ -83,7 +81,11 @@ impl PaintApp {
                 ui.selectable_value(&mut self.drawing.selected, Action::DrawVu, "Vu Line");
                 ui.selectable_value(&mut self.drawing.selected, Action::DrawCircle, "Circle");
                 ui.selectable_value(&mut self.drawing.selected, Action::DrawEllips, "Ellips");
-                ui.selectable_value(&mut self.drawing.selected, Action::DrawHyperbola, "Hyperbola");
+                ui.selectable_value(
+                    &mut self.drawing.selected,
+                    Action::DrawHyperbola,
+                    "Hyperbola",
+                );
                 ui.selectable_value(&mut self.drawing.selected, Action::DrawParabola, "Parabola");
             });
         if previous != self.drawing.selected && !matches!(self.drawing.mode, Mode::Computing) {
@@ -108,7 +110,7 @@ impl PaintApp {
                 }
                 if let Some(pixels) = self.drawing.processing_func.next() {
                     for (pixel, debug_pixel) in pixels {
-                        println!("Pixel: {:?}", pixel);
+                        println!("{:?}", pixel);
                         self.drawing.points.push(pixel);
                         self.debug.points.push(debug_pixel);
                     }
@@ -137,42 +139,6 @@ impl PaintApp {
             self.start_computing();
         }
     }
-
-    // fn generate_line(
-    //     &mut self,
-    //     start: egui::Pos2,
-    //     end: egui::Pos2,
-    //     line_type: LineType,
-    // ) -> Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>> {
-    //     self.drawing.mode = Mode::Computing;
-    //     self.debug.points.clear();
-    //     match line_type {
-    //         LineType::First => Box::new(self.first(start, end)),
-    //         LineType::Second => Box::new(self.second(start, end)),
-    //         LineType::Third => Box::new(self.third(start, end)),
-    //     }
-    // }
-
-    // fn generate_circle(
-    //     &mut self,
-    //     start: egui::Pos2,
-    //     end: egui::Pos2,
-    // ) -> Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>> {
-    //     self.drawing.mode = Mode::Computing;
-    //     self.debug.points.clear();
-    //     Box::new(self.paint_circle(start, end))
-    // }
-    //
-    // fn generate_ellips(
-    //     &mut self,
-    //     start: egui::Pos2,
-    //     a: f32,
-    //     b: f32,
-    // ) -> Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>> {
-    //     self.drawing.mode = Mode::Computing;
-    //     self.debug.points.clear();
-    //     Box::new(self.paint_ellips(start, a, b))
-    // }
 
     fn start_computing(&mut self) {
         self.drawing.mode = Mode::Computing;

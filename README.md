@@ -24,7 +24,7 @@
 
 ## Листинг кода
 ### Алгоритм ЦДА
-```
+```rust
 pub fn dda_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<(Pixel, Pixel)>> {
     let length = (end.x - start.x).abs().max((end.y - start.y).abs());
     let dx = (end.x - start.x) / length;
@@ -101,7 +101,7 @@ pub fn dda_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<
 
 ## Листинг кода
 ### Алгоритм ЦДА
-```
+```rust
 pub fn paint_circle(
     start: egui::Pos2,
     end: egui::Pos2,

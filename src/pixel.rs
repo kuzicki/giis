@@ -14,6 +14,13 @@ impl Pixel {
         }
     }
 
+    pub fn new_i32(x: i32, y: i32, intensity: u8) -> Self {
+        Self {
+            pos: egui::Pos2::new(x as f32, y as f32),
+            intensity,
+        }
+    }
+
     pub fn from_pos(pos: egui::Pos2, intensity: u8) -> Self {
         Self { pos, intensity }
     }

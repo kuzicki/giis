@@ -40,7 +40,7 @@ impl From<&Action> for ParameterState {
 
 pub struct DrawingState {
     pub points: Vec<Pixel>,
-    pub processing_func: Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>>,
+    pub processing_func: Box<dyn Iterator<Item = Vec<Pixel>>>,
     pub mode: Mode,
     pub selected: Action,
     pub parameters: ParameterState,
@@ -60,18 +60,18 @@ impl Default for DrawingState {
 
 pub struct DebugState {
     pub enabled: bool,
-    pub points: Vec<Pixel>,
     pub start: Option<egui::Pos2>,
     pub end: Option<egui::Pos2>,
+    pub points: Vec<Pixel>,
 }
 
 impl Default for DebugState {
     fn default() -> Self {
         Self {
             enabled: false,
-            points: Vec::new(),
             start: None,
             end: None,
+            points: vec![],
         }
     }
 }
@@ -95,6 +95,7 @@ impl Default for ExecutionControl {
 pub struct ViewportSettings {
     pub debug_scale: f32,
     pub scroll_offset: egui::Vec2,
+    pub offset: egui::Pos2,
 }
 
 impl Default for ViewportSettings {
@@ -102,6 +103,7 @@ impl Default for ViewportSettings {
         Self {
             debug_scale: 10.0,
             scroll_offset: egui::Vec2::new(0.0, 0.0),
+            offset: egui::Pos2::default(),
         }
     }
 }

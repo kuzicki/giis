@@ -55,12 +55,16 @@ impl super::PaintApp {
 
         let window_center = rect.left_top();
 
-        if response.dragged() {}
-
         for pixel in &self.debug.points {
             let grid_point = egui::Pos2::new(
-                ((pixel.pos.x + 2.0 - self.viewport.scroll_offset.x) * grid_size) + window_center.x,
-                ((pixel.pos.y + 2.0 - self.viewport.scroll_offset.y) * grid_size) + window_center.y,
+                (((pixel.pos.x - self.viewport.offset.x) + 2.0 - self.viewport.scroll_offset.x)
+                    .floor()
+                    * grid_size)
+                    + window_center.x,
+                (((pixel.pos.y - self.viewport.offset.y) + 2.0 - self.viewport.scroll_offset.y)
+                    .floor()
+                    * grid_size)
+                    + window_center.y,
             );
             let color = egui::Color32::from_rgba_premultiplied(0, 0, 0, pixel.intensity);
             let rect =

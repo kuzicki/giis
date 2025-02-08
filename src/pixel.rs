@@ -1,6 +1,6 @@
 use eframe::egui;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Pixel {
     pub pos: egui::Pos2,
     pub intensity: u8,

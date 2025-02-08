@@ -1,10 +1,7 @@
 use crate::pixel::Pixel;
 use eframe::egui;
 
-pub fn paint_circle(
-    start: egui::Pos2,
-    end: egui::Pos2,
-) -> impl Iterator<Item = Vec<(Pixel, Pixel)>> {
+pub fn paint_circle(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<Pixel>> {
     let mut x = 0;
     let r = start.distance(end) as i32;
     let mut y = r;
@@ -38,14 +35,7 @@ pub fn paint_circle(
     Box::new(func_iter)
 }
 
-fn circle_sym(
-    start: egui::Pos2,
-    x: i32,
-    y: i32,
-    x_off: i32,
-    y_off: i32,
-    r: i32,
-) -> Vec<(Pixel, Pixel)> {
+fn circle_sym(start: egui::Pos2, x: i32, y: i32, x_off: i32, y_off: i32, r: i32) -> Vec<Pixel> {
     let offsets = [
         (x, y),
         (-x, y),
@@ -60,24 +50,11 @@ fn circle_sym(
     let (start_x, start_y) = (start.x as i32, start.y as i32);
     offsets
         .into_iter()
-        .map(|(dx, dy)| {
-            (
-                Pixel::new_i32(start_x + dx, start_y + dy, 255),
-                Pixel::new_i32(
-                    start_x + dx - x_off as i32 + r,
-                    start_y + dy - y_off as i32 + r,
-                    255,
-                ),
-            )
-        })
+        .map(|(dx, dy)| (Pixel::new_i32(start_x + dx, start_y + dy, 255)))
         .collect()
 }
 
-pub fn paint_ellips(
-    center: egui::Pos2,
-    a: f32,
-    b: f32,
-) -> Box<dyn Iterator<Item = Vec<(Pixel, Pixel)>>> {
+pub fn paint_ellips(center: egui::Pos2, a: f32, b: f32) -> Box<dyn Iterator<Item = Vec<Pixel>>> {
     let mut x = 0.0;
     let mut y = b;
 
@@ -100,7 +77,7 @@ pub fn paint_ellips(
             if !region1 {
                 d2 = b * b * (x + 0.5).powi(2) + a * a * (y - 1.0).powi(2) - a * a * b * b;
             }
-            Some(quadrant_sym(center, old_x, old_y, a, b, x_offset, y_offset))
+            Some(quadrant_sym(center, old_x, old_y))
         } else if y >= 0.0 {
             let (old_x, old_y) = (x, y);
             if d2 > 0.0 {
@@ -110,7 +87,7 @@ pub fn paint_ellips(
                 x += 1.0;
             }
             y -= 1.0;
-            return Some(quadrant_sym(center, old_x, old_y, a, b, x_offset, y_offset));
+            return Some(quadrant_sym(center, old_x, old_y));
         } else {
             None
         }
@@ -123,7 +100,7 @@ pub fn paint_hyperbola(
     a: f32,
     b: f32,
     max_iterations: u32,
-) -> impl Iterator<Item = Vec<(Pixel, Pixel)>> {
+) -> impl Iterator<Item = Vec<Pixel>> {
     let a_sq = (a * a) as i32;
     let b_sq = (b * b) as i32;
     let mut x = a as i32;
@@ -165,15 +142,7 @@ pub fn paint_hyperbola(
             y += 1;
         }
 
-        Some(quadrant_sym(
-            center,
-            old_x as f32,
-            old_y as f32,
-            0.0,
-            0.0,
-            x_off,
-            y_off,
-        ))
+        Some(quadrant_sym(center, old_x as f32, old_y as f32))
     })
 }
 
@@ -181,7 +150,7 @@ pub fn paint_parabola(
     center: egui::Pos2,
     p: f32,
     max_iterations: u32,
-) -> impl Iterator<Item = Vec<(Pixel, Pixel)>> {
+) -> impl Iterator<Item = Vec<Pixel>> {
     let (cx, cy) = (center.x, center.y);
     let p_int = p as i32;
     let mut x = 0i32;
@@ -223,40 +192,15 @@ pub fn paint_parabola(
             y += 1;
         }
 
-        Some(quadrant_sym(
-            center,
-            old_x as f32,
-            old_y as f32,
-            0.0,
-            0.0,
-            x_off,
-            y_off,
-        ))
+        Some(quadrant_sym(center, old_x as f32, old_y as f32))
     })
 }
 
-fn quadrant_sym(
-    center: egui::Pos2,
-    x: f32,
-    y: f32,
-    a: f32,
-    b: f32,
-    x_off: f32,
-    y_off: f32,
-) -> Vec<(Pixel, Pixel)> {
+fn quadrant_sym(center: egui::Pos2, x: f32, y: f32) -> Vec<Pixel> {
     let offsets = [(x, y), (-x, y), (x, -y), (-x, -y)];
 
     offsets
         .into_iter()
-        .map(|(dx, dy)| {
-            (
-                Pixel::new(center.x + dx, center.y + dy, 255),
-                Pixel::new(
-                    (center.x + dx - x_off + a).floor(),
-                    (center.y + dy - y_off + b).floor(),
-                    255,
-                ),
-            )
-        })
+        .map(|(dx, dy)| (Pixel::new(center.x + dx, center.y + dy, 255)))
         .collect()
 }

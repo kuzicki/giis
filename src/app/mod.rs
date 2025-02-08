@@ -34,8 +34,8 @@ impl eframe::App for PaintApp {
             self.figure_combobox(ui);
 
             if ui.button("Clear").clicked() && !matches!(self.drawing.mode, Mode::Computing) {
-                self.drawing.points.clear();
                 self.debug.points.clear();
+                self.drawing.points.clear();
             }
             self.update_computation(ctx);
             self.main_painter(ui);
@@ -109,19 +109,20 @@ impl PaintApp {
                     return;
                 }
                 if let Some(pixels) = self.drawing.processing_func.next() {
-                    for (pixel, debug_pixel) in pixels {
-                        println!("{:?}", pixel);
-                        self.drawing.points.push(pixel);
+                    for pixel in pixels {
+                        let debug_pixel = pixel.clone();
                         self.debug.points.push(debug_pixel);
+                        self.drawing.points.push(pixel);
                     }
                 } else {
                     self.drawing.mode = Mode::Awaiting;
                 }
             } else {
                 for pixels in self.drawing.processing_func.as_mut() {
-                    for (pixel, debug_pixel) in pixels {
-                        self.drawing.points.push(pixel);
+                    for pixel in pixels {
+                        let debug_pixel = pixel.clone();
                         self.debug.points.push(debug_pixel);
+                        self.drawing.points.push(pixel);
                     }
                 }
                 self.drawing.mode = Mode::Awaiting;
@@ -141,9 +142,10 @@ impl PaintApp {
     }
 
     fn start_computing(&mut self) {
-        self.drawing.mode = Mode::Computing;
         self.debug.points.clear();
-        self.drawing.processing_func = self.drawing.parameters.generate_pixels();
+        self.drawing.mode = Mode::Computing;
+        (self.drawing.processing_func, self.viewport.offset) =
+            self.drawing.parameters.generate_pixels();
         self.drawing.parameters = ParameterState::from(&self.drawing.selected)
     }
 

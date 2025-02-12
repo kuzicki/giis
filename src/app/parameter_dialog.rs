@@ -17,9 +17,12 @@ impl FigureParameters for ParameterState {
             ps::Ellips(ellips) => ellips.show_dialog(ctx),
             ps::Hyperbola(hyperbola) => hyperbola.show_dialog(ctx),
             ps::Parabola(parabola) => parabola.show_dialog(ctx),
+            ps::Curve(curve) => curve.show_dialog(ctx)
         }
     }
 }
+
+impl FigureParameters for figure_parameters::Curve {}
 
 impl FigureParameters for figure_parameters::Line {}
 

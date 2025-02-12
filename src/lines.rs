@@ -6,16 +6,14 @@ pub fn dda_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<
     let dx = (end.x - start.x) / length;
     let dy = (end.y - start.y) / length;
 
-    let (x_offset, y_offset) = (start.x.min(end.x), start.y.min(end.y));
-
     let mut x = start.x + 0.5 * sign(dx);
     let mut y = start.y + 0.5 * sign(dy);
 
     let mut i = 0.0;
-    let first_value = std::iter::once(vec![(Pixel::new(x, y, 255))]);
+    let first_value = std::iter::once(vec![(Pixel::new_black(x, y, 255))]);
     let func_iter = std::iter::from_fn(move || {
         if i <= length {
-            let current = Pixel::new(x.floor(), y.floor(), 255);
+            let current = Pixel::new_black(x.floor(), y.floor(), 255);
             x = x + dx;
             y = y + dy;
             i += 1.0;
@@ -33,7 +31,6 @@ pub fn bresenham_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item 
     let mut y = start.y.round() as i32;
     let end_x = end.x.round() as i32;
     let end_y = end.y.round() as i32;
-    let (x_offset, y_offset) = (start.x.min(end.x), start.y.min(end.y));
 
     let dx = (end_x - x).abs();
     let dy = (end_y - y).abs();
@@ -41,7 +38,7 @@ pub fn bresenham_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item 
     let sy = if start.y < end.y { 1 } else { -1 };
 
     let mut err = dx - dy;
-    let first_value = std::iter::once(vec![(Pixel::new(x as f32, y as f32, 255))]);
+    let first_value = std::iter::once(vec![(Pixel::new_black(x as f32, y as f32, 255))]);
     let func_iter = std::iter::from_fn(move || {
         if x == end_x && y == end_y {
             return None;
@@ -59,7 +56,7 @@ pub fn bresenham_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item 
         }
 
         let (x, y) = (x as f32, y as f32);
-        return Some(vec![(Pixel::new(x, y, 255))]);
+        return Some(vec![(Pixel::new_black(x, y, 255))]);
     });
     first_value.chain(func_iter)
 }
@@ -74,13 +71,13 @@ fn get_intensity(
     let inverted_intensity = (255.0 * (1.0 - normalized_intensity)) as u8;
     if steep {
         vec![
-            Pixel::new(y_intercept.floor(), x_current.floor(), inverted_intensity),
-            Pixel::new(y_intercept.floor() + 1.0, x_current.floor(), intensity),
+            Pixel::new_black(y_intercept.floor(), x_current.floor(), inverted_intensity),
+            Pixel::new_black(y_intercept.floor() + 1.0, x_current.floor(), intensity),
         ]
     } else {
         vec![
-            Pixel::new(x_current.floor(), y_intercept.floor(), inverted_intensity),
-            Pixel::new(x_current.floor(), y_intercept.floor() + 1.0, intensity),
+            Pixel::new_black(x_current.floor(), y_intercept.floor(), inverted_intensity),
+            Pixel::new_black(x_current.floor(), y_intercept.floor() + 1.0, intensity),
         ]
     }
 }
@@ -90,7 +87,6 @@ pub fn wu_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<P
     let y = start.y;
     let end_x = end.x;
     let end_y = end.y;
-    let (x_offset, y_offset) = (start.x.min(end.x), start.y.min(end.y));
 
     let dx = end_x - x;
     let dy = end_y - y;
@@ -121,9 +117,9 @@ pub fn wu_line(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = Vec<P
         if first {
             first = false;
             if steep {
-                return Some(vec![(Pixel::new(y.floor(), x.floor(), 255))]);
+                return Some(vec![(Pixel::new_black(y.floor(), x.floor(), 255))]);
             } else {
-                return Some(vec![(Pixel::new(x.floor(), y.floor(), 255))]);
+                return Some(vec![(Pixel::new_black(x.floor(), y.floor(), 255))]);
             }
         }
 

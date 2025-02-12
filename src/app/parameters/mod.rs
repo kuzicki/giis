@@ -1,6 +1,10 @@
-use crate::pixel::Pixel;
+use super::figure::CurveType;
+use super::figure::{ConnectableCurves, EditableControlPoints, Figure, Selectable};
 use eframe::egui;
+pub(super) mod click_action;
 pub(super) mod figure_parameters;
+pub(super) mod generate_figure;
+pub(super) mod mode_panel;
 
 pub enum ParameterState {
     Line(figure_parameters::Line),
@@ -8,6 +12,7 @@ pub enum ParameterState {
     Ellips(figure_parameters::Ellips),
     Hyperbola(figure_parameters::Hyperbola),
     Parabola(figure_parameters::Parabola),
+    Curve(figure_parameters::Curve),
 }
 
 impl Default for ParameterState {
@@ -34,14 +39,62 @@ impl From<&Action> for ParameterState {
             DrawEllips => ps::Ellips(fp::Ellips::default()),
             DrawHyperbola => ps::Hyperbola(fp::Hyperbola::default()),
             DrawParabola => ps::Parabola(fp::Parabola::default()),
+            DrawHermite | DrawBezier | DrawBSpline => match figure {
+                DrawHermite => ps::Curve(fp::Curve::new(CurveType::Hermite)),
+                DrawBezier => ps::Curve(fp::Curve::new(CurveType::Bezier)),
+                DrawBSpline => ps::Curve(fp::Curve::new(CurveType::BSpline)),
+                _ => unreachable!(),
+            },
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum Mode {
+    None,
+    Debug,
+    ConnectCurve(Option<usize>),
+    MoveControlPoints(Option<usize>),
+}
+
+impl PartialEq for Mode {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Mode::None, Mode::None) => true,
+            (Mode::Debug, Mode::Debug) => true,
+            (Mode::ConnectCurve(_), Mode::ConnectCurve(_)) => true,
+            (Mode::MoveControlPoints(_), Mode::MoveControlPoints(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Mode {
+    pub fn change_to(&mut self, figures: &mut Vec<Box<dyn Figure>>, new_mode: Mode) {
+        match self {
+            Mode::ConnectCurve(Some(index)) | Mode::MoveControlPoints(Some(index)) => {
+                if let Some(selectable) = figures[*index].as_selectable_mut() {
+                    selectable.deselect();
+                }
+            }
+            _ => (),
+        }
+        *self = new_mode;
+    }
+
+    pub fn reset(&mut self) {
+        *self = match self {
+            Mode::ConnectCurve(Some(_)) => Mode::ConnectCurve(None),
+            Mode::MoveControlPoints(Some(_)) => Mode::MoveControlPoints(None),
+            _ => self.clone(),
         }
     }
 }
 
 pub struct DrawingState {
-    pub points: Vec<Pixel>,
-    pub processing_func: Box<dyn Iterator<Item = Vec<Pixel>>>,
-    pub mode: Mode,
+    pub figures: Vec<Box<dyn Figure>>,
+    pub selected_figure: Option<usize>,
+    pub status: Status,
     pub selected: Action,
     pub parameters: ParameterState,
 }
@@ -49,30 +102,22 @@ pub struct DrawingState {
 impl Default for DrawingState {
     fn default() -> Self {
         Self {
-            points: Vec::new(),
             selected: Action::DrawDDA,
-            processing_func: Box::new(std::iter::empty()),
-            mode: Mode::Awaiting,
+            status: Status::Awaiting,
             parameters: ParameterState::default(),
+            figures: vec![],
+            selected_figure: None,
         }
     }
 }
 
 pub struct DebugState {
-    pub enabled: bool,
-    pub start: Option<egui::Pos2>,
-    pub end: Option<egui::Pos2>,
-    pub points: Vec<Pixel>,
+    pub figure_index: Option<usize>,
 }
 
 impl Default for DebugState {
     fn default() -> Self {
-        Self {
-            enabled: false,
-            start: None,
-            end: None,
-            points: vec![],
-        }
+        Self { figure_index: None }
     }
 }
 
@@ -95,7 +140,6 @@ impl Default for ExecutionControl {
 pub struct ViewportSettings {
     pub debug_scale: f32,
     pub scroll_offset: egui::Vec2,
-    pub offset: egui::Pos2,
 }
 
 impl Default for ViewportSettings {
@@ -103,7 +147,6 @@ impl Default for ViewportSettings {
         Self {
             debug_scale: 10.0,
             scroll_offset: egui::Vec2::new(0.0, 0.0),
-            offset: egui::Pos2::default(),
         }
     }
 }
@@ -117,9 +160,27 @@ pub enum Action {
     DrawEllips,
     DrawHyperbola,
     DrawParabola,
+    DrawHermite,
+    DrawBezier,
+    DrawBSpline,
 }
 
 impl Action {
+    pub fn variants() -> &'static [Action] {
+        &[
+            Action::DrawDDA,
+            Action::DrawBresenham,
+            Action::DrawVu,
+            Action::DrawCircle,
+            Action::DrawEllips,
+            Action::DrawHyperbola,
+            Action::DrawParabola,
+            Action::DrawHermite,
+            Action::DrawBezier,
+            Action::DrawBSpline,
+        ]
+    }
+
     pub fn to_str(&self) -> &str {
         use Action as fg;
         match self {
@@ -130,12 +191,15 @@ impl Action {
             fg::DrawEllips => "Ellips",
             fg::DrawHyperbola => "Hyperbola",
             fg::DrawParabola => "Parabola",
+            fg::DrawHermite => "Hermite curve",
+            fg::DrawBezier => "Bezier curve",
+            fg::DrawBSpline => "B-spline curve",
         }
     }
 }
 
 #[derive(Debug)]
-pub enum Mode {
+pub enum Status {
     Awaiting,
     Computing,
 }

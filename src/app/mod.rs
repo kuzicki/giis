@@ -1,17 +1,18 @@
 use eframe::egui;
-mod click_action;
 mod debug_window;
-mod generate_pixels;
+mod figure;
 mod parameter_dialog;
 mod parameters;
 use click_action::ClickAction;
-use generate_pixels::GeneratePixels;
+use generate_figure::GenerateFigure;
+use mode_panel::ModePanel;
 use parameter_dialog::FigureParameters;
 use parameters::*;
 
 pub struct PaintApp {
     drawing: DrawingState,
     debug: DebugState,
+    mode: Mode,
     execution: ExecutionControl,
     viewport: ViewportSettings,
 }
@@ -23,6 +24,7 @@ impl Default for PaintApp {
             debug: DebugState::default(),
             execution: ExecutionControl::default(),
             viewport: ViewportSettings::default(),
+            mode: Mode::None,
         }
     }
 }
@@ -30,12 +32,13 @@ impl Default for PaintApp {
 impl eframe::App for PaintApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.checkbox(&mut self.debug.enabled, "Debug mode");
+            self.show_panel(ui);
             self.figure_combobox(ui);
 
-            if ui.button("Clear").clicked() && !matches!(self.drawing.mode, Mode::Computing) {
-                self.debug.points.clear();
-                self.drawing.points.clear();
+            if ui.button("Clear").clicked() && !matches!(self.drawing.status, Status::Computing) {
+                self.mode.reset();
+                self.drawing.figures.clear();
+                self.debug.figure_index = None;
             }
             self.update_computation(ctx);
             self.main_painter(ui);
@@ -59,12 +62,25 @@ impl PaintApp {
             }
 
             painter.rect_filled(rect, 0.0, egui::Color32::LIGHT_BLUE);
-            for pixel in &mut self.drawing.points {
-                let color = egui::Color32::from_rgba_premultiplied(0, 0, 0, pixel.intensity);
-                let rect = egui::Rect::from_min_size(pixel.pos, egui::Vec2::new(1.0, 1.0));
-                painter.rect_filled(rect, 0.0, color);
+            for figure in self.drawing.figures.iter() {
+                for pixel in figure.get_pixels() {
+                    let red = pixel.red;
+                    let green = pixel.green;
+                    let blue = pixel.blue;
+                    let color =
+                        egui::Color32::from_rgba_premultiplied(red, green, blue, pixel.intensity);
+
+                    let rect = egui::Rect::from_min_size(pixel.pos, egui::Vec2::new(1.0, 1.0));
+                    painter.rect_filled(rect, 0.0, color);
+                }
             }
         });
+    }
+
+    fn show_panel(&mut self, ui: &mut egui::Ui) {
+        self.drawing
+            .parameters
+            .show_panel(ui, &mut self.mode, &mut self.drawing.figures);
     }
 
     fn figure_combobox(&mut self, ui: &mut egui::Ui) {
@@ -72,30 +88,23 @@ impl PaintApp {
         egui::ComboBox::from_label("")
             .selected_text(format!("{}", self.drawing.selected.to_str()))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.drawing.selected, Action::DrawDDA, "DDA Line");
-                ui.selectable_value(
-                    &mut self.drawing.selected,
-                    Action::DrawBresenham,
-                    "Bresenham's Line",
-                );
-                ui.selectable_value(&mut self.drawing.selected, Action::DrawVu, "Vu Line");
-                ui.selectable_value(&mut self.drawing.selected, Action::DrawCircle, "Circle");
-                ui.selectable_value(&mut self.drawing.selected, Action::DrawEllips, "Ellips");
-                ui.selectable_value(
-                    &mut self.drawing.selected,
-                    Action::DrawHyperbola,
-                    "Hyperbola",
-                );
-                ui.selectable_value(&mut self.drawing.selected, Action::DrawParabola, "Parabola");
+                for action in Action::variants() {
+                    ui.selectable_value(
+                        &mut self.drawing.selected,
+                        action.clone(),
+                        action.to_str(),
+                    );
+                }
             });
-        if previous != self.drawing.selected && !matches!(self.drawing.mode, Mode::Computing) {
+        if previous != self.drawing.selected && !matches!(self.drawing.status, Status::Computing) {
+            self.mode.change_to(&mut self.drawing.figures, Mode::None);
             self.drawing.parameters = ParameterState::from(&self.drawing.selected)
         }
     }
 
     fn update_computation(&mut self, ctx: &egui::Context) {
-        if matches!(self.drawing.mode, Mode::Computing) {
-            if self.debug.enabled {
+        if matches!(self.drawing.status, Status::Computing) {
+            if matches!(self.mode, Mode::Debug) {
                 if self.execution.paused {
                     return;
                 }
@@ -108,44 +117,73 @@ impl PaintApp {
                     ctx.request_repaint();
                     return;
                 }
-                if let Some(pixels) = self.drawing.processing_func.next() {
-                    for pixel in pixels {
-                        let debug_pixel = pixel.clone();
-                        self.debug.points.push(debug_pixel);
-                        self.drawing.points.push(pixel);
-                    }
-                } else {
-                    self.drawing.mode = Mode::Awaiting;
-                }
-            } else {
-                for pixels in self.drawing.processing_func.as_mut() {
-                    for pixel in pixels {
-                        let debug_pixel = pixel.clone();
-                        self.debug.points.push(debug_pixel);
-                        self.drawing.points.push(pixel);
+                if let Some(index) = self.debug.figure_index {
+                    if let Some(debug_figure) = self.drawing.figures[index].as_debug_mut() {
+                        if !debug_figure.update_frame() {
+                            self.drawing.status = Status::Awaiting;
+                        }
                     }
                 }
-                self.drawing.mode = Mode::Awaiting;
             }
             ctx.request_repaint();
         }
     }
 
     fn handle_painter_click(&mut self, pos: egui::Pos2) {
-        if !matches!(self.drawing.mode, Mode::Awaiting) {
+        if !matches!(self.drawing.status, Status::Awaiting) {
             return;
         }
-
-        if self.drawing.parameters.handle_click(pos) {
-            self.start_computing();
+        match self.mode {
+            Mode::None | Mode::Debug => {
+                if self.drawing.parameters.handle_click(pos) {
+                    self.start_computing();
+                }
+            }
+            Mode::MoveControlPoints(ref mut index) => {
+                if let Some(index_inner) = index {
+                    if let Some(editable) =
+                        self.drawing.figures[*index_inner].as_editable_points_mut()
+                    {
+                        if let Some(point_index) = editable.hit_test_control_point(pos, 3.0) {
+                            editable.toggle_point(point_index);
+                        } else {
+                            if !editable.move_point(pos) {
+                                *index = None;
+                            }
+                        }
+                    }
+                } else {
+                    for (new_index, figure) in self.drawing.figures.iter_mut().enumerate() {
+                        if let Some(selectable) = figure.as_selectable_mut() {
+                            if selectable.hit_test(pos) {
+                                selectable.select();
+                                // Set the mode to MoveControlPoints with the index of the selected figure
+                                *index = Some(new_index);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            Mode::ConnectCurve(index) => {}
         }
     }
 
     fn start_computing(&mut self) {
-        self.debug.points.clear();
-        self.drawing.mode = Mode::Computing;
-        (self.drawing.processing_func, self.viewport.offset) =
-            self.drawing.parameters.generate_pixels();
+        let mut new_figure = self
+            .drawing
+            .parameters
+            .generate_figure()
+            .expect("Generating figure only on events");
+        if matches!(self.mode, Mode::Debug) {
+            self.drawing.status = Status::Computing;
+        } else {
+            if let Some(figure) = new_figure.as_debug_mut() {
+                figure.evaluate();
+            }
+        }
+        self.debug.figure_index = Some(self.drawing.figures.len());
+        self.drawing.figures.push(new_figure);
         self.drawing.parameters = ParameterState::from(&self.drawing.selected)
     }
 

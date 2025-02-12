@@ -3,6 +3,7 @@ mod pixel;
 mod app;
 mod second_order_lines;
 mod lines;
+mod curves;
 use app::PaintApp;
 
 

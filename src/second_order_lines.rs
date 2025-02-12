@@ -7,8 +7,6 @@ pub fn paint_circle(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = 
     let mut y = r;
     let mut d = 2 - 2 * r;
 
-    let (x_offset, y_offset) = (start.x.min(end.x), start.y.min(end.y));
-
     let func_iter = std::iter::from_fn(move || {
         if x <= y {
             let (old_x, old_y) = (x, y);
@@ -24,9 +22,6 @@ pub fn paint_circle(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = 
                 start,
                 old_x,
                 old_y,
-                x_offset as i32,
-                y_offset as i32,
-                r,
             ))
         } else {
             None
@@ -35,7 +30,7 @@ pub fn paint_circle(start: egui::Pos2, end: egui::Pos2) -> impl Iterator<Item = 
     Box::new(func_iter)
 }
 
-fn circle_sym(start: egui::Pos2, x: i32, y: i32, x_off: i32, y_off: i32, r: i32) -> Vec<Pixel> {
+fn circle_sym(start: egui::Pos2, x: i32, y: i32) -> Vec<Pixel> {
     let offsets = [
         (x, y),
         (-x, y),
@@ -50,7 +45,7 @@ fn circle_sym(start: egui::Pos2, x: i32, y: i32, x_off: i32, y_off: i32, r: i32)
     let (start_x, start_y) = (start.x as i32, start.y as i32);
     offsets
         .into_iter()
-        .map(|(dx, dy)| (Pixel::new_i32(start_x + dx, start_y + dy, 255)))
+        .map(|(dx, dy)| (Pixel::new_black_i32(start_x + dx, start_y + dy, 255)))
         .collect()
 }
 
@@ -60,7 +55,6 @@ pub fn paint_ellips(center: egui::Pos2, a: f32, b: f32) -> Box<dyn Iterator<Item
 
     let mut d1 = (b * b) - (a * a * b) + (0.25 * a * a);
     let mut region1 = true;
-    let (x_offset, y_offset) = (center.x, center.y);
     let mut d2 = 0.0;
     let func_iter = std::iter::from_fn(move || {
         if region1 {
@@ -106,8 +100,6 @@ pub fn paint_hyperbola(
     let mut x = a as i32;
     let mut y = 0i32;
     let mut iteration = 0;
-    let x_off = center.x - max_iterations as f32 - a * 2.0;
-    let y_off = center.y - max_iterations as f32;
 
     let mut d1 = b_sq * (x * x - (x - 1) * (x - 1)) - a_sq * (y * y);
 
@@ -151,14 +143,10 @@ pub fn paint_parabola(
     p: f32,
     max_iterations: u32,
 ) -> impl Iterator<Item = Vec<Pixel>> {
-    let (cx, cy) = (center.x, center.y);
     let p_int = p as i32;
     let mut x = 0i32;
     let mut y = 0i32;
     let mut iteration = 0;
-
-    let x_off = cx - max_iterations as f32;
-    let y_off = cy - max_iterations as f32;
 
     let mut d1 = 1 - 2 * p_int;
 
@@ -201,6 +189,6 @@ fn quadrant_sym(center: egui::Pos2, x: f32, y: f32) -> Vec<Pixel> {
 
     offsets
         .into_iter()
-        .map(|(dx, dy)| (Pixel::new(center.x + dx, center.y + dy, 255)))
+        .map(|(dx, dy)| (Pixel::new_black(center.x + dx, center.y + dy, 255)))
         .collect()
 }

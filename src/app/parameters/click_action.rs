@@ -1,5 +1,5 @@
 use super::figure_parameters;
-use super::parameters::ParameterState;
+use super::ParameterState;
 use eframe::egui;
 
 pub trait ClickAction {
@@ -8,12 +8,14 @@ pub trait ClickAction {
 
 impl ClickAction for ParameterState {
     fn handle_click(&mut self, pos: egui::Pos2) -> bool {
+        use ParameterState as ps;
         match self {
-            ParameterState::Line(params) => params.handle_click(pos),
-            ParameterState::Circle(params) => params.handle_click(pos),
-            ParameterState::Ellips(params) => params.handle_click(pos),
-            ParameterState::Hyperbola(params) => params.handle_click(pos),
-            ParameterState::Parabola(params) => params.handle_click(pos),
+            ps::Line(params) => params.handle_click(pos),
+            ps::Circle(params) => params.handle_click(pos),
+            ps::Ellips(params) => params.handle_click(pos),
+            ps::Hyperbola(params) => params.handle_click(pos),
+            ps::Parabola(params) => params.handle_click(pos),
+            ps::Curve(params) => params.handle_click(pos)
         }
     }
 }
@@ -66,5 +68,13 @@ impl ClickAction for figure_parameters::Hyperbola {
             self.start = Some(pos);
         }
         false
+    }
+}
+
+
+impl ClickAction for figure_parameters::Curve {
+    fn handle_click(&mut self, pos: egui::Pos2) -> bool {
+        self.control_points.push(pos);
+        self.control_points.len() == 4
     }
 }

@@ -1,11 +1,11 @@
 use eframe::egui;
+use super::super::figure::CurveType;
 #[derive(Clone)]
 pub enum LineType {
     First,
     Second,
     Third,
 }
-
 
 pub struct Line {
     pub start: Option<egui::Pos2>,
@@ -48,7 +48,7 @@ impl Default for Ellips {
 pub struct Parabola {
     pub start: Option<egui::Pos2>,
     pub p: f32,
-    pub max_iterations: u32
+    pub max_iterations: u32,
 }
 
 impl Default for Parabola {
@@ -56,7 +56,7 @@ impl Default for Parabola {
         Self {
             start: None,
             p: 15.0,
-            max_iterations: 100
+            max_iterations: 100,
         }
     }
 }
@@ -65,7 +65,7 @@ pub struct Hyperbola {
     pub start: Option<egui::Pos2>,
     pub a: f32,
     pub b: f32,
-    pub max_iterations: u32
+    pub max_iterations: u32,
 }
 
 impl Default for Hyperbola {
@@ -75,6 +75,21 @@ impl Default for Hyperbola {
             a: 15.0,
             b: 10.0,
             max_iterations: 100,
+        }
+    }
+}
+
+
+pub struct Curve {
+    pub control_points: Vec<egui::Pos2>,
+    pub curve_type: CurveType,
+}
+
+impl Curve {
+    pub fn new(curve_type: CurveType) -> Self {
+        Self {
+            control_points: vec![],
+            curve_type,
         }
     }
 }

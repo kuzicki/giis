@@ -1,6 +1,5 @@
 use super::{Drawable, Figure, Selectable, Transformable};
-use crate::pixel::Pixel;
-use eframe::egui::{Color32, Context, InputState, Key, Pos2, Shape, Stroke};
+use eframe::egui::{Color32, InputState, Key, Pos2, Shape, Stroke};
 use nalgebra::{Matrix4, Rotation3, Vector3, Vector4};
 
 pub struct Object {
@@ -98,8 +97,6 @@ impl Object {
     }
 
     fn get_scale_matrix(&self) -> Matrix4<f32> {
-        // Matrix4::new_nonuniform_scaling(&self.scale)
-
         let mut res = Matrix4::identity();
         for i in 0..self.scale.len() {
             res[(i, i)] = self.scale[i].clone();
@@ -109,14 +106,12 @@ impl Object {
     }
 
     fn get_rotation_matrix(&self) -> Matrix4<f32> {
-        // Matrix4::from_euler_angles(self.rotation.x, self.rotation.y, self.rotation.z);
         let rotation =
             Rotation3::from_euler_angles(self.rotation.x, self.rotation.y, self.rotation.z);
         rotation.to_homogeneous()
     }
 
     fn get_tranlation_matrix(&self) -> Matrix4<f32> {
-        // Matrix4::new_translation(&self.translation);
         let mut res = Matrix4::identity();
         res.fixed_view_mut::<3, 1>(0, 3).copy_from(&self.translation);
         res
@@ -356,7 +351,7 @@ fn get_perspective_matrix(fov: f32, aspect: f32, near: f32, far: f32) -> Matrix4
 
 fn world_to_screen(ndc: Vector3<f32>, screen_width: f32, screen_height: f32) -> Pos2 {
     let x = (ndc.x + 1.0) * 0.5 * screen_width;
-    let y = (1.0 - ndc.y) * 0.5 * screen_height; // Flip Y since screen coords have (0,0) at the top-left
+    let y = (1.0 - ndc.y) * 0.5 * screen_height;
 
     Pos2::new(x, y)
 }

@@ -348,11 +348,16 @@ pub fn generate_hermite_curve(p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, pixels: &m
 Перемещение объекта в 3D пространстве осуществляется с помощью матрицы трансляции. Трансляция изменяет координаты объекта, сдвигая его на определенную величину в трех осях. Матрица трансляции для перемещения на (Tx, Ty, Tz) выглядит следующим образом:
 
 $$
-\begin{bmatrix} x \\ y \\ z \\ 1 \end{bmatrix}
-=
-\begin{bmatrix} 1 & 0 & 0 & T_x \\ 0 & 1 & 0 & T_y \\ 0 & 0 & 1 & T_z \\ 0 & 0 & 0 & 1 \end{bmatrix}
-\begin{bmatrix} x' \\ y' \\ z' \\ 1 \end{bmatrix}.
+\begin{bmatrix} x \\ y \\ z \\ 1 \end{bmatrix} =
+\begin{bmatrix} 
+1 & 0 & 0 & T_x \\ 
+0 & 1 & 0 & T_y \\ 
+0 & 0 & 1 & T_z \\ 
+0 & 0 & 0 & 1 
+\end{bmatrix}
+\begin{bmatrix} x' \\ y' \\ z' \\ 1 \end{bmatrix}
 $$
+
 
 Каждая вершина объекта умножается на эту матрицу для выполнения перемещения.
 

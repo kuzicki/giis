@@ -1,5 +1,5 @@
-use eframe::egui;
 use super::super::figure::CurveType;
+use eframe::egui;
 #[derive(Clone)]
 pub enum LineType {
     First,
@@ -79,7 +79,6 @@ impl Default for Hyperbola {
     }
 }
 
-
 pub struct Curve {
     pub control_points: Vec<egui::Pos2>,
     pub curve_type: CurveType,
@@ -90,6 +89,20 @@ impl Curve {
         Self {
             control_points: vec![],
             curve_type,
+        }
+    }
+}
+
+pub struct Object {
+    pub start: Option<egui::Pos2>,
+    pub file_path: String,
+}
+
+impl Object {
+    pub fn new() -> Self {
+        Self {
+            start: None,
+            file_path: String::new(),
         }
     }
 }

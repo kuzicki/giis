@@ -54,6 +54,7 @@ impl ModePanel for ParameterState {
             | ps::Parabola(..)
             | ps::Hyperbola(..) => show_debug(ui, mode, figures),
             ps::Curve(..) => show_curve_panel(ui, mode, figures),
+            ps::Object(..) => (),
         }
     }
 }

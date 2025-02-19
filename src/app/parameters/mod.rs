@@ -13,6 +13,7 @@ pub enum ParameterState {
     Hyperbola(figure_parameters::Hyperbola),
     Parabola(figure_parameters::Parabola),
     Curve(figure_parameters::Curve),
+    Object(figure_parameters::Object),
 }
 
 impl Default for ParameterState {
@@ -45,6 +46,7 @@ impl From<&Action> for ParameterState {
                 DrawBSpline => ps::Curve(fp::Curve::new(CurveType::BSpline)),
                 _ => unreachable!(),
             },
+            LoadObject => ps::Object(fp::Object::new()),
         }
     }
 }
@@ -55,6 +57,7 @@ pub enum Mode {
     Debug,
     ConnectCurve(Option<usize>),
     MoveControlPoints(Option<usize>),
+    TransformObject(Option<usize>),
 }
 
 impl PartialEq for Mode {
@@ -72,7 +75,9 @@ impl PartialEq for Mode {
 impl Mode {
     pub fn change_to(&mut self, figures: &mut Vec<Box<dyn Figure>>, new_mode: Mode) {
         match self {
-            Mode::ConnectCurve(Some(index)) | Mode::MoveControlPoints(Some(index)) => {
+            Mode::ConnectCurve(Some(index))
+            | Mode::MoveControlPoints(Some(index))
+            | Mode::TransformObject(Some(index)) => {
                 if let Some(selectable) = figures[*index].as_selectable_mut() {
                     selectable.deselect();
                 }
@@ -86,6 +91,7 @@ impl Mode {
         *self = match self {
             Mode::ConnectCurve(Some(_)) => Mode::ConnectCurve(None),
             Mode::MoveControlPoints(Some(_)) => Mode::MoveControlPoints(None),
+            Mode::TransformObject(Some(_)) => Mode::TransformObject(None),
             _ => self.clone(),
         }
     }
@@ -163,6 +169,7 @@ pub enum Action {
     DrawHermite,
     DrawBezier,
     DrawBSpline,
+    LoadObject,
 }
 
 impl Action {
@@ -178,6 +185,7 @@ impl Action {
             Action::DrawHermite,
             Action::DrawBezier,
             Action::DrawBSpline,
+            Action::LoadObject,
         ]
     }
 
@@ -194,6 +202,7 @@ impl Action {
             fg::DrawHermite => "Hermite curve",
             fg::DrawBezier => "Bezier curve",
             fg::DrawBSpline => "B-spline curve",
+            fg::LoadObject => "3D object transforms",
         }
     }
 }

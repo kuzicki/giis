@@ -1,4 +1,4 @@
-use super::{ConnectableCurves, EditableControlPoints, Figure, Selectable};
+use super::{draw_pixels, ConnectableCurves, Drawable, EditableControlPoints, Figure, Selectable};
 use crate::curves::{generate_bezier_curve, generate_bspline_curve, generate_hermite_curve};
 use crate::pixel::Pixel;
 use eframe::egui::Pos2;
@@ -38,6 +38,21 @@ impl Curve {
         if self.selected {
             self.draw_control_points();
         }
+    }
+
+    fn bounding_box(&self) -> (Pos2, Pos2) {
+        self.points.iter().fold(
+            (
+                Pos2::new(f32::INFINITY, f32::INFINITY),
+                Pos2::new(f32::NEG_INFINITY, f32::NEG_INFINITY),
+            ),
+            |(min, max), p| {
+                (
+                    Pos2::new(min.x.min(p.pos.x), min.y.min(p.pos.y)),
+                    Pos2::new(max.x.max(p.pos.x), max.y.max(p.pos.y)),
+                )
+            },
+        )
     }
 
     fn draw_control_points(&mut self) {
@@ -94,9 +109,7 @@ impl Curve {
                 self.control_points[3],
                 &mut self.points,
             ),
-            CurveType::BSpline => {
-                generate_bspline_curve(&self.control_points, &mut self.points)
-            }
+            CurveType::BSpline => generate_bspline_curve(&self.control_points, &mut self.points),
         }
     }
 
@@ -105,10 +118,6 @@ impl Curve {
 }
 
 impl Figure for Curve {
-    fn get_pixels(&self) -> &[Pixel] {
-        self.points.as_slice()
-    }
-
     fn as_selectable(&self) -> Option<&dyn super::Selectable> {
         Some(self)
     }
@@ -138,7 +147,6 @@ impl Selectable for Curve {
         self.update_render();
     }
 
-
     fn hit_test(&self, pos: Pos2) -> bool {
         if self.points.is_empty() {
             return false;
@@ -147,8 +155,7 @@ impl Selectable for Curve {
         let (min, max) = self.bounding_box();
 
         // Step 2: Quick Bounding Box Rejection
-        if pos.x < min.x || pos.x > max.x || pos.y < min.y || pos.y > max.y
-        {
+        if pos.x < min.x || pos.x > max.x || pos.y < min.y || pos.y > max.y {
             return false;
         }
 
@@ -160,20 +167,6 @@ impl Selectable for Curve {
         })
     }
 
-    fn bounding_box(&self) -> (Pos2, Pos2) {
-        self.points.iter().fold(
-            (
-                Pos2::new(f32::INFINITY, f32::INFINITY),
-                Pos2::new(f32::NEG_INFINITY, f32::NEG_INFINITY),
-            ),
-            |(min, max), p| {
-                (
-                    Pos2::new(min.x.min(p.pos.x), min.y.min(p.pos.y)),
-                    Pos2::new(max.x.max(p.pos.x), max.y.max(p.pos.y)),
-                )
-            },
-        )
-    }
 }
 
 impl EditableControlPoints for Curve {
@@ -232,4 +225,10 @@ fn distance_to_line_segment(p1: Pos2, p2: Pos2, point: Pos2) -> f32 {
     let t_clamped = t.clamp(0.0, 1.0);
     let closest = Pos2::new(p1.x + t_clamped * v.x, p1.y + t_clamped * v.y);
     point.distance(closest)
+}
+
+impl Drawable for Curve {
+    fn draw(&self, painter: &eframe::egui::Painter) {
+        draw_pixels(&self.points, painter);
+    }
 }

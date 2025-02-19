@@ -1,4 +1,4 @@
-use super::{Debuggable, Figure};
+use super::{draw_pixels, Debuggable, Drawable, Figure};
 use crate::pixel::Pixel;
 use eframe::egui::Pos2;
 
@@ -19,10 +19,6 @@ impl Line {
 }
 
 impl Figure for Line {
-    fn get_pixels(&self) -> &[crate::pixel::Pixel] {
-        self.points.as_slice()
-    }
-
     fn as_debug_mut(&mut self) -> Option<&mut dyn Debuggable> {
         Some(self)
     }
@@ -33,3 +29,9 @@ impl Figure for Line {
 }
 
 impl_debuggable!(Line, update_func, points, debug_offset);
+
+impl Drawable for Line {
+    fn draw(&self, painter: &eframe::egui::Painter) {
+        draw_pixels(&self.points, painter);
+    }
+}

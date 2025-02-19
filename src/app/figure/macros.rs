@@ -19,7 +19,10 @@ macro_rules! impl_debuggable {
             fn get_offset(&self) -> Pos2 {
                 self.$debug_offset.clone()
             }
+
+            fn get_pixels(&self) -> &[crate::pixel::Pixel] {
+                self.$points.as_slice()
+            }
         }
     };
 }
-

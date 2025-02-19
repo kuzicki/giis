@@ -32,6 +32,7 @@ impl Default for PaintApp {
 impl eframe::App for PaintApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            self.handle_keyboard(ctx);
             self.show_panel(ui);
             self.figure_combobox(ui);
 
@@ -63,18 +64,33 @@ impl PaintApp {
 
             painter.rect_filled(rect, 0.0, egui::Color32::LIGHT_BLUE);
             for figure in self.drawing.figures.iter() {
-                for pixel in figure.get_pixels() {
-                    let red = pixel.red;
-                    let green = pixel.green;
-                    let blue = pixel.blue;
-                    let color =
-                        egui::Color32::from_rgba_premultiplied(red, green, blue, pixel.intensity);
+                figure.draw(&painter);
+            }
+        });
+    }
 
-                    let rect = egui::Rect::from_min_size(pixel.pos, egui::Vec2::new(1.0, 1.0));
-                    painter.rect_filled(rect, 0.0, color);
+    fn handle_keyboard(&mut self, ctx: &egui::Context) {
+        ctx.input(|i| {
+            if i.key_pressed(egui::Key::T) {
+                match (&self.drawing.parameters, &mut self.mode) {
+                    (ParameterState::Object(_), Mode::None | Mode::TransformObject(Some(_))) => {
+                        self.mode
+                            .change_to(&mut self.drawing.figures, Mode::TransformObject(None));
+                    }
+                    (ParameterState::Object(_), Mode::TransformObject(None)) => {
+                        self.mode.change_to(&mut self.drawing.figures, Mode::None);
+                    }
+                    _ => (),
+                }
+            } else {
+                if let Mode::TransformObject(Some(index)) = self.mode {
+                    if let Some(figure) = self.drawing.figures[index].as_transformable_mut() {
+                        figure.handle_keyboard(i);
+                    }
                 }
             }
         });
+        ctx.request_repaint();
     }
 
     fn show_panel(&mut self, ui: &mut egui::Ui) {
@@ -154,10 +170,9 @@ impl PaintApp {
                     }
                 } else {
                     for (new_index, figure) in self.drawing.figures.iter_mut().enumerate() {
-                        if let Some(selectable) = figure.as_selectable_mut() {
-                            if selectable.hit_test(pos) {
-                                selectable.select();
-                                // Set the mode to MoveControlPoints with the index of the selected figure
+                        if let Some(target) = figure.as_editable_points_mut() {
+                            if target.hit_test(pos) {
+                                target.select();
                                 *index = Some(new_index);
                                 break;
                             }
@@ -165,7 +180,20 @@ impl PaintApp {
                     }
                 }
             }
-            Mode::ConnectCurve(index) => {}
+            Mode::ConnectCurve(_index) => {}
+            Mode::TransformObject(ref mut index) => {
+                if let None = index {
+                    for (new_index, figure) in self.drawing.figures.iter_mut().enumerate() {
+                        if let Some(target) = figure.as_transformable_mut() {
+                            if target.hit_test(pos) {
+                                target.select();
+                                *index = Some(new_index);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -14,7 +14,7 @@ fn matrix_multiply(a: &[[f32; 4]; 4], b: &[f32; 4]) -> [f32; 4] {
     result
 }
 
-fn multiply_hermite_coeffs(coeffs: &[f32; 4], t_vec: &[f32; 4]) -> f32 {
+fn multiply_coeffs(coeffs: &[f32; 4], t_vec: &[f32; 4]) -> f32 {
     let mut result = 0.0;
     for i in 0..4 {
         result += coeffs[i] * t_vec[i];
@@ -47,8 +47,8 @@ pub fn generate_hermite_curve(p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, pixels: &m
         let t = i as f32 / steps as f32;
         let t_vec = [t * t * t, t * t, t, 1.0];
 
-        let x = multiply_hermite_coeffs(&x_coeffs, &t_vec);
-        let y = multiply_hermite_coeffs(&y_coeffs, &t_vec);
+        let x = multiply_coeffs(&x_coeffs, &t_vec);
+        let y = multiply_coeffs(&y_coeffs, &t_vec);
 
         pixels.push(Pixel::new_black(x, y, 255));
     }
@@ -79,8 +79,8 @@ pub fn generate_bezier_curve(p0: Pos2, p1: Pos2, p2: Pos2, p3: Pos2, pixels: &mu
         let x_coeffs = matrix_multiply(&bezier_matrix, &control_points_x);
         let y_coeffs = matrix_multiply(&bezier_matrix, &control_points_y);
 
-        let x = multiply_hermite_coeffs(&x_coeffs, &t_vector);
-        let y = multiply_hermite_coeffs(&y_coeffs, &t_vector);
+        let x = multiply_coeffs(&x_coeffs, &t_vector);
+        let y = multiply_coeffs(&y_coeffs, &t_vector);
 
         pixels.push(Pixel::new_black(x, y, 255));
     }

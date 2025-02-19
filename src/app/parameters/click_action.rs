@@ -15,7 +15,8 @@ impl ClickAction for ParameterState {
             ps::Ellips(params) => params.handle_click(pos),
             ps::Hyperbola(params) => params.handle_click(pos),
             ps::Parabola(params) => params.handle_click(pos),
-            ps::Curve(params) => params.handle_click(pos)
+            ps::Curve(params) => params.handle_click(pos),
+            ps::Object(params) => params.handle_click(pos),
         }
     }
 }
@@ -71,10 +72,18 @@ impl ClickAction for figure_parameters::Hyperbola {
     }
 }
 
-
 impl ClickAction for figure_parameters::Curve {
     fn handle_click(&mut self, pos: egui::Pos2) -> bool {
         self.control_points.push(pos);
         self.control_points.len() == 4
+    }
+}
+
+impl ClickAction for figure_parameters::Object {
+    fn handle_click(&mut self, pos: egui::Pos2) -> bool {
+        if self.start.is_none() {
+            self.start = Some(pos);
+        }
+        false
     }
 }

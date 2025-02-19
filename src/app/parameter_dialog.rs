@@ -1,6 +1,7 @@
 use super::figure_parameters;
 use super::parameters::ParameterState;
 use eframe::egui;
+use rfd::FileDialog;
 
 pub trait FigureParameters {
     fn show_dialog(&mut self, _ctx: &egui::Context) -> bool {
@@ -17,7 +18,8 @@ impl FigureParameters for ParameterState {
             ps::Ellips(ellips) => ellips.show_dialog(ctx),
             ps::Hyperbola(hyperbola) => hyperbola.show_dialog(ctx),
             ps::Parabola(parabola) => parabola.show_dialog(ctx),
-            ps::Curve(curve) => curve.show_dialog(ctx)
+            ps::Curve(curve) => curve.show_dialog(ctx),
+            ps::Object(object) => object.show_dialog(ctx),
         }
     }
 }
@@ -107,6 +109,38 @@ impl FigureParameters for figure_parameters::Parabola {
                         .range(1..=1000),
                 );
 
+                if ui.button("Apply").clicked() {
+                    apply_changes = true;
+                }
+
+                if ui.button("Cancel").clicked() {
+                    self.start = None;
+                }
+            });
+        }
+        apply_changes
+    }
+}
+
+impl FigureParameters for figure_parameters::Object {
+    fn show_dialog(&mut self, ctx: &egui::Context) -> bool {
+        let mut apply_changes = false;
+        if self.start.is_some() {
+            egui::Window::new("Open file(.obj)").show(ctx, |ui| {
+                let selected_file = if self.file_path != "" {
+                    format!("Selected file: {}", self.file_path)
+                } else {
+                    format!("No file selected")
+                };
+                if ui.button("Select file").clicked() {
+                    if let Some(path) = FileDialog::new()
+                        .add_filter("OBJ files", &["obj"])
+                        .pick_file()
+                    {
+                        self.file_path = path.to_string_lossy().to_string();
+                    }
+                }
+                ui.label(selected_file);
                 if ui.button("Apply").clicked() {
                     apply_changes = true;
                 }

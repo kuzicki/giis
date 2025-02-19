@@ -1,4 +1,4 @@
-use super::{Debuggable, Figure};
+use super::{Debuggable, Figure, Drawable, draw_pixels};
 use crate::pixel::Pixel;
 use eframe::egui::Pos2;
 
@@ -19,10 +19,6 @@ impl Hyperbola {
 }
 
 impl Figure for Hyperbola {
-    fn get_pixels(&self) -> &[Pixel] {
-        self.points.as_slice()
-    }
-
     fn as_debug_mut(&mut self) -> Option<&mut dyn Debuggable> {
         Some(self)
     }
@@ -33,3 +29,10 @@ impl Figure for Hyperbola {
 }
 
 impl_debuggable!(Hyperbola, update_func, points, debug_offset);
+
+
+impl Drawable for Hyperbola {
+    fn draw(&self, painter: &eframe::egui::Painter) {
+        draw_pixels(&self.points, painter);
+    }
+}

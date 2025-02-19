@@ -1,4 +1,4 @@
-use super::{Debuggable, Figure};
+use super::{draw_pixels, Debuggable, Drawable, Figure};
 use crate::pixel::Pixel;
 use eframe::egui::Pos2;
 
@@ -19,16 +19,18 @@ impl Circle {
 }
 
 impl Figure for Circle {
-    fn get_pixels(&self) -> &[Pixel] {
-        self.points.as_slice()
-    }
-
     fn as_debug_mut(&mut self) -> Option<&mut dyn Debuggable> {
         Some(self)
     }
 
     fn as_debug(&self) -> Option<&dyn Debuggable> {
         Some(self)
+    }
+}
+
+impl Drawable for Circle {
+    fn draw(&self, painter: &eframe::egui::Painter) {
+        draw_pixels(&self.points, painter);
     }
 }
 

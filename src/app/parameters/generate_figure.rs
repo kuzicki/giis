@@ -1,4 +1,4 @@
-use super::super::figure::{Circle, Curve, Ellips, Hyperbola, Line, Parabola};
+use super::super::figure::{Circle, Curve, Ellips, Hyperbola, Line, Object, Parabola};
 use super::figure_parameters;
 use super::figure_parameters::LineType;
 use super::Figure;
@@ -15,7 +15,6 @@ pub trait GenerateFigure {
 impl GenerateFigure for ParameterState {
     fn generate_figure(&mut self) -> Option<Box<dyn Figure>> {
         use ParameterState as ps;
-        println!("Generating");
         match self {
             ps::Line(params) => params.generate_figure(),
             ps::Circle(params) => params.generate_figure(),
@@ -23,6 +22,7 @@ impl GenerateFigure for ParameterState {
             ps::Hyperbola(params) => params.generate_figure(),
             ps::Parabola(params) => params.generate_figure(),
             ps::Curve(params) => params.generate_figure(),
+            ps::Object(params) => params.generate_figure(),
         }
     }
 }
@@ -152,5 +152,18 @@ impl GenerateFigure for figure_parameters::Curve {
             [first, second, third, fourth],
             curve_type.clone(),
         )))
+    }
+}
+
+impl GenerateFigure for figure_parameters::Object {
+    fn generate_figure(&mut self) -> Option<Box<dyn Figure>> {
+        if let figure_parameters::Object {
+            start: Some(pos),
+            file_path,
+        } = self
+        {
+            return Some(Box::new(Object::new(file_path, *pos)));
+        }
+        None
     }
 }

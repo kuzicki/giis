@@ -1,4 +1,4 @@
-use super::super::figure::{Circle, Curve, Ellips, Hyperbola, Line, Object, Parabola};
+use super::super::figure::{Circle, Curve, Ellips, Hyperbola, Line, Object, Parabola, Polygon};
 use super::figure_parameters;
 use super::figure_parameters::LineType;
 use super::Figure;
@@ -23,6 +23,7 @@ impl GenerateFigure for ParameterState {
             ps::Parabola(params) => params.generate_figure(),
             ps::Curve(params) => params.generate_figure(),
             ps::Object(params) => params.generate_figure(),
+            ps::Polygon(params) => params.generate_figure(),
         }
     }
 }
@@ -163,6 +164,15 @@ impl GenerateFigure for figure_parameters::Object {
         } = self
         {
             return Some(Box::new(Object::new(file_path, *pos)));
+        }
+        None
+    }
+}
+
+impl GenerateFigure for figure_parameters::Polygon {
+    fn generate_figure(&mut self) -> Option<Box<dyn Figure>> {
+        if self.points.len() > 1 {
+            return Some(Box::new(Polygon::new(self.points.clone())));
         }
         None
     }

@@ -17,6 +17,7 @@ impl ClickAction for ParameterState {
             ps::Parabola(params) => params.handle_click(pos),
             ps::Curve(params) => params.handle_click(pos),
             ps::Object(params) => params.handle_click(pos),
+            ps::Polygon(params) => params.handle_click(pos),
         }
     }
 }
@@ -84,6 +85,13 @@ impl ClickAction for figure_parameters::Object {
         if self.start.is_none() {
             self.start = Some(pos);
         }
+        false
+    }
+}
+
+impl ClickAction for figure_parameters::Polygon {
+    fn handle_click(&mut self, pos: egui::Pos2) -> bool {
+        self.points.push(pos);
         false
     }
 }

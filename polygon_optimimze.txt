@@ -1,0 +1,60 @@
+// fn group_pixels_into_rectangles(pixels: Vec<Pixel>) -> Vec<Rect> {
+//     let mut rectangles = vec![];
+//
+//     let mut current_rect: Option<Rect> = None;
+//
+//     for pixel in pixels {
+//         // Start with the first pixel in a new group
+//         if current_rect.is_none() {
+//             current_rect = Some(Rect::from_min_size(pixel.pos, Vec2::new(1.0, 1.0)));
+//         }
+//
+//         // Get the current rectangle's min and max values
+//         let rect = current_rect.unwrap();
+//         let min = rect.min;
+//         let max = rect.max;
+//
+//         // If the next pixel is contiguous and has the same color, merge it into the group
+//         if is_contiguous(&pixel, &min, &max) {
+//             // Expand the current rectangle to include this pixel
+//             current_rect = Some(expand_rect(&pixel, rect));
+//         } else {
+//             // Save the current rectangle and start a new one
+//             rectangles.push(current_rect.unwrap());
+//             current_rect = Some(Rect::from_min_size(pixel.pos, Vec2::new(1.0, 1.0)));
+//         }
+//     }
+//
+//     // Push the last rectangle
+//     if let Some(rect) = current_rect {
+//         rectangles.push(rect);
+//     }
+//
+//     rectangles
+// }
+//
+// fn is_contiguous(pixel: &Pixel, min: &Pos2, max: &Pos2) -> bool {
+//     let x = pixel.pos.x;
+//     let y = pixel.pos.y;
+//
+//     // Check if pixel is *on* the boundary
+//     let on_vertical_border = x == min.x || x == max.x;
+//     let on_horizontal_border = y == min.y || y == max.y;
+//
+//     // Check if pixel is *just inside* the shape (not outside!)
+//     let near_vertical_border = x > min.x && x < max.x;
+//     let near_horizontal_border = y > min.y && y < max.y;
+//
+//     // A pixel is contiguous if it's exactly on the border or slightly inside
+//     (on_vertical_border && near_horizontal_border) || (on_horizontal_border && near_vertical_border)
+// }
+//
+// // Helper function to expand a rectangle to include the new pixel
+// fn expand_rect(pixel: &Pixel, rect: Rect) -> Rect {
+//     let min_x = f32::min(rect.min.x, pixel.pos.x);
+//     let min_y = f32::min(rect.min.y, pixel.pos.y);
+//     let max_x = f32::max(rect.max.x, pixel.pos.x + 1.0); // Assuming 1px wide pixels
+//     let max_y = f32::max(rect.max.y, pixel.pos.y + 1.0); // Assuming 1px tall pixels
+//
+//     Rect::from_min_max(Pos2::new(min_x, min_y), Pos2::new(max_x, max_y))
+// }

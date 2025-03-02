@@ -5,7 +5,7 @@ use eframe::egui::{Painter, Rect};
 
 impl super::PaintApp {
     pub(super) fn debug_window(&mut self, ctx: &egui::Context) {
-        if matches!(self.mode, Mode::Debug) {
+        if matches!(self.drawing.mode, Mode::Debug) {
             egui::Window::new("Debug window").show(ctx, |ui| {
                 let mut scale = self.viewport.debug_scale as i32;
                 ui.add(

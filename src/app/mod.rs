@@ -1,18 +1,18 @@
 use eframe::egui;
 mod debug_window;
 mod figure;
+mod mode_panel;
 mod parameter_dialog;
 mod parameters;
 use click_action::ClickAction;
 use generate_figure::GenerateFigure;
-use mode_panel::ModePanel;
+use keyboard_action::KeyboardAction;
 use parameter_dialog::FigureParameters;
 use parameters::*;
 
 pub struct PaintApp {
     drawing: DrawingState,
     debug: DebugState,
-    mode: Mode,
     execution: ExecutionControl,
     viewport: ViewportSettings,
 }
@@ -24,7 +24,6 @@ impl Default for PaintApp {
             debug: DebugState::default(),
             execution: ExecutionControl::default(),
             viewport: ViewportSettings::default(),
-            mode: Mode::None,
         }
     }
 }
@@ -33,11 +32,12 @@ impl eframe::App for PaintApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.handle_keyboard(ctx);
+            self.show_modal_mindow(ctx);
             self.show_panel(ui);
-            self.figure_combobox(ui);
+            self.action_combobox(ui);
 
             if ui.button("Clear").clicked() && !matches!(self.drawing.status, Status::Computing) {
-                self.mode.reset();
+                self.drawing.reset();
                 self.drawing.figures.clear();
                 self.debug.figure_index = None;
             }
@@ -69,23 +69,46 @@ impl PaintApp {
         });
     }
 
+    fn show_modal_mindow(&mut self, ctx: &egui::Context) {
+        if self.viewport.modal_window_text == "" {
+            return;
+        }
+        ctx.layer_painter(egui::LayerId::new(
+            egui::Order::Middle,
+            egui::Id::new("modal_bg"),
+        ))
+        .rect_filled(ctx.screen_rect(), 0.0, egui::Color32::from_black_alpha(10));
+
+        let modal = egui::containers::Modal::new(egui::Id::new("Info"));
+        modal.show(ctx, |ui| {
+            ui.label(&self.viewport.modal_window_text);
+            if ui.button("Close").clicked() {
+                self.viewport.modal_window_text = "".to_string();
+            }
+        });
+    }
+
     fn handle_keyboard(&mut self, ctx: &egui::Context) {
         ctx.input(|i| {
             if i.key_pressed(egui::Key::T) {
-                match (&self.drawing.parameters, &mut self.mode) {
+                match (&self.drawing.parameters, &mut self.drawing.mode) {
                     (ParameterState::Object(_), Mode::None | Mode::TransformObject(Some(_))) => {
-                        self.mode
-                            .change_to(&mut self.drawing.figures, Mode::TransformObject(None));
+                        self.drawing.change_mode(Mode::TransformObject(None));
                     }
                     (ParameterState::Object(_), Mode::TransformObject(None)) => {
-                        self.mode.change_to(&mut self.drawing.figures, Mode::None);
+                        self.drawing.change_mode(Mode::None);
                     }
                     _ => (),
                 }
             } else {
-                if let Mode::TransformObject(Some(index)) = self.mode {
+                if let Mode::TransformObject(Some(index)) = self.drawing.mode {
                     if let Some(figure) = self.drawing.figures[index].as_transformable_mut() {
                         figure.handle_keyboard(i);
+                    }
+                }
+                if let Mode::None = self.drawing.mode {
+                    if self.drawing.parameters.handle_key(i) {
+                        self.start_computing();
                     }
                 }
             }
@@ -93,13 +116,7 @@ impl PaintApp {
         ctx.request_repaint();
     }
 
-    fn show_panel(&mut self, ui: &mut egui::Ui) {
-        self.drawing
-            .parameters
-            .show_panel(ui, &mut self.mode, &mut self.drawing.figures);
-    }
-
-    fn figure_combobox(&mut self, ui: &mut egui::Ui) {
+    fn action_combobox(&mut self, ui: &mut egui::Ui) {
         let previous = self.drawing.selected.clone();
         egui::ComboBox::from_label("")
             .selected_text(format!("{}", self.drawing.selected.to_str()))
@@ -113,14 +130,14 @@ impl PaintApp {
                 }
             });
         if previous != self.drawing.selected && !matches!(self.drawing.status, Status::Computing) {
-            self.mode.change_to(&mut self.drawing.figures, Mode::None);
+            self.drawing.change_mode(Mode::None);
             self.drawing.parameters = ParameterState::from(&self.drawing.selected)
         }
     }
 
     fn update_computation(&mut self, ctx: &egui::Context) {
         if matches!(self.drawing.status, Status::Computing) {
-            if matches!(self.mode, Mode::Debug) {
+            if matches!(self.drawing.mode, Mode::Debug) {
                 if self.execution.paused {
                     return;
                 }
@@ -149,7 +166,7 @@ impl PaintApp {
         if !matches!(self.drawing.status, Status::Awaiting) {
             return;
         }
-        match self.mode {
+        match self.drawing.mode {
             Mode::None | Mode::Debug => {
                 if self.drawing.parameters.handle_click(pos) {
                     self.start_computing();
@@ -180,7 +197,6 @@ impl PaintApp {
                     }
                 }
             }
-            Mode::ConnectCurve(_index) => {}
             Mode::TransformObject(ref mut index) => {
                 if let None = index {
                     for (new_index, figure) in self.drawing.figures.iter_mut().enumerate() {
@@ -194,6 +210,59 @@ impl PaintApp {
                     }
                 }
             }
+            Mode::PolygonOperations(ref mut index, ref mut test) => match test {
+                PolygonTest::None => {
+                    if let None = index {
+                        for (new_index, figure) in self.drawing.figures.iter_mut().enumerate() {
+                            if let Some(target) = figure.as_polygon_transform_mut() {
+                                if target.hit_test(pos) {
+                                    target.select();
+                                    *index = Some(new_index);
+                                    break;
+                                }
+                            }
+                        }
+                    } else if let Some(ind) = index {
+                        self.drawing
+                            .figures
+                            .get_mut(*ind)
+                            .and_then(|f| f.as_selectable_mut())
+                            .map(|f| f.deselect());
+                        *index = None;
+                    }
+                }
+                PolygonTest::Dot => {
+                    if let Some(ind) = index {
+                        let figure = self
+                            .drawing
+                            .figures
+                            .get_mut(*ind)
+                            .and_then(|f| f.as_polygon_transform())
+                            .expect("Polygon should be already selected");
+                        self.viewport.modal_window_text = if figure.test_dot(pos) {
+                            "The dot is inside".to_string()
+                        } else {
+                            "The dot is not inside".to_string()
+                        };
+                        self.drawing.mode = Mode::PolygonOperations(*index, PolygonTest::None);
+                    }
+                }
+                PolygonTest::Line(start_point) => match (start_point.clone(), *index) {
+                    (Some(start_point), Some(ind)) => {
+                        let figure = self
+                            .drawing
+                            .figures
+                            .get_mut(ind)
+                            .and_then(|f| f.as_polygon_transform_mut())
+                            .expect("Polygon should be already selected");
+                        figure.test_line(start_point, pos);
+                        self.drawing.mode = Mode::PolygonOperations(*index, PolygonTest::None);
+                    }
+                    _ => {
+                        *start_point = Some(pos);
+                    }
+                },
+            },
         }
     }
 
@@ -203,7 +272,8 @@ impl PaintApp {
             .parameters
             .generate_figure()
             .expect("Generating figure only on events");
-        if matches!(self.mode, Mode::Debug) {
+
+        if matches!(self.drawing.mode, Mode::Debug) {
             self.drawing.status = Status::Computing;
         } else {
             if let Some(figure) = new_figure.as_debug_mut() {

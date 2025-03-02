@@ -1,4 +1,4 @@
-use super::{draw_pixels, ConnectableCurves, Drawable, EditableControlPoints, Figure, Selectable};
+use super::{draw_pixels, Drawable, EditableControlPoints, Figure, Selectable};
 use crate::curves::{generate_bezier_curve, generate_bspline_curve, generate_hermite_curve};
 use crate::pixel::Pixel;
 use eframe::egui::Pos2;
@@ -209,12 +209,6 @@ impl EditableControlPoints for Curve {
             return true;
         }
         false
-    }
-}
-
-impl ConnectableCurves for Curve {
-    fn connect_curves(&mut self, other: &mut Self) {
-        unimplemented!()
     }
 }
 

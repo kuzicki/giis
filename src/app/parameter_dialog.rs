@@ -20,6 +20,7 @@ impl FigureParameters for ParameterState {
             ps::Parabola(parabola) => parabola.show_dialog(ctx),
             ps::Curve(curve) => curve.show_dialog(ctx),
             ps::Object(object) => object.show_dialog(ctx),
+            ps::Polygon(polygon) => polygon.show_dialog(ctx)
         }
     }
 }
@@ -153,3 +154,6 @@ impl FigureParameters for figure_parameters::Object {
         apply_changes
     }
 }
+
+
+impl FigureParameters for figure_parameters::Polygon {}

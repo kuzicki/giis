@@ -1,10 +1,10 @@
 use super::figure::CurveType;
-use super::figure::{ConnectableCurves, EditableControlPoints, Figure, Selectable};
+use super::figure::{Figure, Selectable};
 use eframe::egui;
 pub(super) mod click_action;
 pub(super) mod figure_parameters;
 pub(super) mod generate_figure;
-pub(super) mod mode_panel;
+pub(super) mod keyboard_action;
 
 pub enum ParameterState {
     Line(figure_parameters::Line),
@@ -14,6 +14,7 @@ pub enum ParameterState {
     Parabola(figure_parameters::Parabola),
     Curve(figure_parameters::Curve),
     Object(figure_parameters::Object),
+    Polygon(figure_parameters::Polygon),
 }
 
 impl Default for ParameterState {
@@ -47,17 +48,25 @@ impl From<&Action> for ParameterState {
                 _ => unreachable!(),
             },
             LoadObject => ps::Object(fp::Object::new()),
+            DrawPolygon => ps::Polygon(fp::Polygon::new()),
         }
     }
+}
+
+#[derive(Clone)]
+pub enum PolygonTest {
+    Line(Option<egui::Pos2>),
+    Dot,
+    None,
 }
 
 #[derive(Clone)]
 pub enum Mode {
     None,
     Debug,
-    ConnectCurve(Option<usize>),
     MoveControlPoints(Option<usize>),
     TransformObject(Option<usize>),
+    PolygonOperations(Option<usize>, PolygonTest),
 }
 
 impl PartialEq for Mode {
@@ -65,19 +74,19 @@ impl PartialEq for Mode {
         match (self, other) {
             (Mode::None, Mode::None) => true,
             (Mode::Debug, Mode::Debug) => true,
-            (Mode::ConnectCurve(_), Mode::ConnectCurve(_)) => true,
             (Mode::MoveControlPoints(_), Mode::MoveControlPoints(_)) => true,
+            (Mode::PolygonOperations(..), Mode::PolygonOperations(..)) => true,
             _ => false,
         }
     }
 }
 
 impl Mode {
-    pub fn change_to(&mut self, figures: &mut Vec<Box<dyn Figure>>, new_mode: Mode) {
+    fn change_to(&mut self, figures: &mut Vec<Box<dyn Figure>>, new_mode: Mode) {
         match self {
-            Mode::ConnectCurve(Some(index))
-            | Mode::MoveControlPoints(Some(index))
-            | Mode::TransformObject(Some(index)) => {
+            Mode::MoveControlPoints(Some(index))
+            | Mode::TransformObject(Some(index))
+            | Mode::PolygonOperations(Some(index), _) => {
                 if let Some(selectable) = figures[*index].as_selectable_mut() {
                     selectable.deselect();
                 }
@@ -87,19 +96,19 @@ impl Mode {
         *self = new_mode;
     }
 
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         *self = match self {
-            Mode::ConnectCurve(Some(_)) => Mode::ConnectCurve(None),
             Mode::MoveControlPoints(Some(_)) => Mode::MoveControlPoints(None),
             Mode::TransformObject(Some(_)) => Mode::TransformObject(None),
+            Mode::PolygonOperations(Some(_), _) => Mode::PolygonOperations(None, PolygonTest::None),
             _ => self.clone(),
         }
     }
 }
 
 pub struct DrawingState {
+    pub mode: Mode,
     pub figures: Vec<Box<dyn Figure>>,
-    pub selected_figure: Option<usize>,
     pub status: Status,
     pub selected: Action,
     pub parameters: ParameterState,
@@ -112,8 +121,18 @@ impl Default for DrawingState {
             status: Status::Awaiting,
             parameters: ParameterState::default(),
             figures: vec![],
-            selected_figure: None,
+            mode: Mode::None,
         }
+    }
+}
+
+impl DrawingState {
+    pub fn change_mode(&mut self, new_mode: Mode) {
+        self.mode.change_to(&mut self.figures, new_mode);
+    }
+
+    pub fn reset(&mut self) {
+        self.mode.reset();
     }
 }
 
@@ -146,6 +165,7 @@ impl Default for ExecutionControl {
 pub struct ViewportSettings {
     pub debug_scale: f32,
     pub scroll_offset: egui::Vec2,
+    pub modal_window_text: String
 }
 
 impl Default for ViewportSettings {
@@ -153,6 +173,7 @@ impl Default for ViewportSettings {
         Self {
             debug_scale: 10.0,
             scroll_offset: egui::Vec2::new(0.0, 0.0),
+            modal_window_text: String::new()
         }
     }
 }
@@ -170,6 +191,7 @@ pub enum Action {
     DrawBezier,
     DrawBSpline,
     LoadObject,
+    DrawPolygon,
 }
 
 impl Action {
@@ -186,23 +208,25 @@ impl Action {
             Action::DrawBezier,
             Action::DrawBSpline,
             Action::LoadObject,
+            Action::DrawPolygon,
         ]
     }
 
     pub fn to_str(&self) -> &str {
-        use Action as fg;
+        use Action as act;
         match self {
-            fg::DrawDDA => "DDA Line",
-            fg::DrawBresenham => "Bresenham's Line",
-            fg::DrawVu => "Vu Line",
-            fg::DrawCircle => "Circle",
-            fg::DrawEllips => "Ellips",
-            fg::DrawHyperbola => "Hyperbola",
-            fg::DrawParabola => "Parabola",
-            fg::DrawHermite => "Hermite curve",
-            fg::DrawBezier => "Bezier curve",
-            fg::DrawBSpline => "B-spline curve",
-            fg::LoadObject => "3D object transforms",
+            act::DrawDDA => "DDA Line",
+            act::DrawBresenham => "Bresenham's Line",
+            act::DrawVu => "Vu Line",
+            act::DrawCircle => "Circle",
+            act::DrawEllips => "Ellips",
+            act::DrawHyperbola => "Hyperbola",
+            act::DrawParabola => "Parabola",
+            act::DrawHermite => "Hermite curve",
+            act::DrawBezier => "Bezier curve",
+            act::DrawBSpline => "B-spline curve",
+            act::LoadObject => "3D object transforms",
+            act::DrawPolygon => "Polygons",
         }
     }
 }

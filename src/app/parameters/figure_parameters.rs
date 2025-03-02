@@ -106,3 +106,15 @@ impl Object {
         }
     }
 }
+
+pub struct Polygon {
+    pub points: Vec<egui::Pos2>
+}
+
+impl Polygon {
+    pub fn new() -> Self {
+        Self {
+            points: vec![]
+        }
+    }
+}

@@ -68,7 +68,7 @@ impl Object {
             indices,
             selected: false,
             rotation: Vector3::new(0.0, 0.0, 0.0),
-            rotation_speed: Vector3::new(1.0, 1.0, 1.0),
+            rotation_speed: Vector3::new(2.0, 2.0, 2.0),
             screen_width: 1536.0,
             screen_height: 800.8,
             fov: 90.0,

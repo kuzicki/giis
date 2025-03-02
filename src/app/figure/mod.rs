@@ -1,5 +1,5 @@
 use crate::pixel::Pixel;
-use eframe::egui::{InputState, Color32, Painter, Pos2, Rect, Vec2};
+use eframe::egui::{Color32, InputState, Painter, Pos2, Rect, Vec2};
 #[macro_use]
 mod macros;
 mod circle;
@@ -9,6 +9,7 @@ mod hyperbola;
 mod line;
 mod object;
 mod parabola;
+mod polygon;
 pub use circle::Circle;
 pub use curve::{Curve, CurveType};
 pub use ellips::Ellips;
@@ -16,9 +17,9 @@ pub use hyperbola::Hyperbola;
 pub use line::Line;
 pub use object::Object;
 pub use parabola::Parabola;
+pub use polygon::Polygon;
 
 pub trait Figure: Drawable {
-
     fn as_selectable(&self) -> Option<&dyn Selectable> {
         None
     }
@@ -50,6 +51,27 @@ pub trait Figure: Drawable {
     fn as_editable_points_mut(&mut self) -> Option<&mut dyn EditableControlPoints> {
         None
     }
+
+    fn as_polygon_transform(&self) -> Option<&dyn PolygonTransform> {
+        None
+    }
+
+    fn as_polygon_transform_mut(&mut self) -> Option<&mut dyn PolygonTransform> {
+        None
+    }
+}
+
+pub trait PolygonTransform: Selectable {
+    fn test_convex(&self) -> bool;
+    fn find_internal_normals(&mut self);
+    fn graham(&mut self);
+    fn jarvis(&mut self);
+    fn test_dot(&self, point: Pos2) -> bool;
+    fn test_line(&mut self, start: Pos2, end: Pos2);
+    fn first(&mut self);
+    fn second(&mut self);
+    fn third(&mut self);
+    fn fourth(&mut self);
 }
 
 pub trait Selectable: Figure {
@@ -64,10 +86,6 @@ pub trait EditableControlPoints: Selectable {
     fn hit_test_control_point(&self, pos: Pos2, radius: f32) -> Option<usize>;
     fn move_point(&mut self, pos: Pos2) -> bool;
     fn toggle_point(&mut self, index: usize);
-}
-
-pub trait ConnectableCurves: EditableControlPoints {
-    fn connect_curves(&mut self, other: &mut Self);
 }
 
 pub trait Debuggable: Figure {

@@ -80,8 +80,7 @@ fn show_polygon_panel(
             }
             if ui.button("Test line").clicked() {
                 if let Mode::PolygonOperations(index, PolygonTest::None) = &mut drawing_state.mode {
-                    drawing_state.mode =
-                        Mode::PolygonOperations(*index, PolygonTest::Line(None));
+                    drawing_state.mode = Mode::PolygonOperations(*index, PolygonTest::Line(None));
                 }
             }
             if ui.button("I").clicked() {
@@ -95,6 +94,9 @@ fn show_polygon_panel(
             }
             if ui.button("IV").clicked() {
                 figure.fourth();
+            }
+            if ui.button("reset fill").clicked() {
+                figure.reset_fill();
             }
         }
     });
@@ -110,7 +112,7 @@ impl PaintApp {
             | ps::Parabola(..)
             | ps::Hyperbola(..) => show_debug(ui, &mut self.drawing),
             ps::Curve(..) => show_curve_panel(ui, &mut self.drawing),
-            ps::Object(..) => (),
+            ps::Object(..) | ps::Voronoi(..) | ps::Delone(..) => (),
             ps::Polygon(..) => show_polygon_panel(ui, &mut self.drawing, &mut self.viewport),
         }
     }

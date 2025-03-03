@@ -13,23 +13,19 @@ impl FigureParameters for ParameterState {
     fn show_dialog(&mut self, ctx: &egui::Context) -> bool {
         use ParameterState as ps;
         match self {
-            ps::Line(line) => line.show_dialog(ctx),
-            ps::Circle(circle) => circle.show_dialog(ctx),
+            ps::Line(..) => false,
+            ps::Circle(..) => false,
             ps::Ellips(ellips) => ellips.show_dialog(ctx),
             ps::Hyperbola(hyperbola) => hyperbola.show_dialog(ctx),
             ps::Parabola(parabola) => parabola.show_dialog(ctx),
-            ps::Curve(curve) => curve.show_dialog(ctx),
+            ps::Curve(..) => false,
             ps::Object(object) => object.show_dialog(ctx),
-            ps::Polygon(polygon) => polygon.show_dialog(ctx)
+            ps::Polygon(..) => false,
+            ps::Delone(..) => false,
+            ps::Voronoi(..) => false
         }
     }
 }
-
-impl FigureParameters for figure_parameters::Curve {}
-
-impl FigureParameters for figure_parameters::Line {}
-
-impl FigureParameters for figure_parameters::Circle {}
 
 impl FigureParameters for figure_parameters::Ellips {
     fn show_dialog(&mut self, ctx: &egui::Context) -> bool {
@@ -154,6 +150,3 @@ impl FigureParameters for figure_parameters::Object {
         apply_changes
     }
 }
-
-
-impl FigureParameters for figure_parameters::Polygon {}

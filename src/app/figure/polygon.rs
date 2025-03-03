@@ -1,16 +1,19 @@
 use super::{Drawable, Figure, PolygonTransform, Selectable};
 use crate::lines;
-use crate::pixel::Pixel;
 use eframe::egui::{Color32, Painter, Pos2, Rect, Shape, Vec2};
-use std::collections::HashSet;
+use std::cell::RefCell;
+use std::collections::{HashSet, VecDeque};
 
 pub struct Polygon {
     control_points: Vec<Pos2>,
-    inner_pixels: Vec<Pixel>,
-    inner_shapes: Vec<Shape>,
+    inner_shapes: RefCell<Vec<Shape>>,
     normals: Vec<Vec2>,
     intercection_points: Vec<Pos2>,
     selected: bool,
+    update_func: RefCell<Box<dyn Iterator<Item = Vec<Shape>>>>,
+    update_delay: Option<std::time::Duration>,
+    update_buffer: RefCell<VecDeque<Shape>>,
+    last_update: RefCell<Option<std::time::Instant>>,
 }
 
 impl Polygon {
@@ -19,9 +22,12 @@ impl Polygon {
             control_points,
             selected: false,
             normals: vec![],
-            inner_pixels: vec![],
-            inner_shapes: vec![],
+            inner_shapes: RefCell::new(vec![]),
             intercection_points: vec![],
+            update_func: RefCell::new(Box::new(std::iter::empty())),
+            update_delay: Some(std::time::Duration::from_micros(100)),
+            update_buffer: RefCell::new(VecDeque::new()),
+            last_update: RefCell::new(None),
         };
         new
     }
@@ -44,7 +50,7 @@ impl Polygon {
     fn is_on_boundary(&self, p: Pos2, eps: f32) -> bool {
         self.control_points.windows(2).any(|pair| {
             let (a, b) = (pair[0], pair[1]);
-            distance_point_to_segment(p, a, b) < eps
+            distance_to_line_segment(p, a, b) < eps
         })
     }
 
@@ -144,7 +150,6 @@ impl Selectable for Polygon {
     }
 
     fn deselect(&mut self) {
-        println!("Deselected");
         self.selected = false;
     }
 
@@ -176,18 +181,44 @@ impl Selectable for Polygon {
     }
 }
 
-fn distance_to_line_segment(p1: Pos2, p2: Pos2, point: Pos2) -> f32 {
-    let v = p2 - p1;
-    let u = point - p1;
-    let t = (u.x * v.x + u.y * v.y) / (v.x * v.x + v.y * v.y);
-    let t_clamped = t.clamp(0.0, 1.0);
-    let closest = Pos2::new(p1.x + t_clamped * v.x, p1.y + t_clamped * v.y);
-    point.distance(closest)
-}
-
 impl Drawable for Polygon {
     fn draw(&self, painter: &eframe::egui::Painter) {
-        draw_pixels(self.inner_shapes.clone(), &painter);
+        if let Some(delay) = self.update_delay {
+            let now = std::time::Instant::now();
+            let mut last_update = self.last_update.borrow_mut();
+
+            if let Some(last) = *last_update {
+                let elapsed = now.duration_since(last);
+                let count = (elapsed.as_secs_f64() / delay.as_secs_f64()).floor() as usize;
+
+                if count > 0 {
+                    *last_update = Some(last + delay * count as u32);
+                    let mut buffer = self.update_buffer.borrow_mut();
+                    let mut shapes = self.inner_shapes.borrow_mut();
+
+                    for _ in 0..count {
+                        if let Some(shape) = buffer.pop_front() {
+                            shapes.push(shape);
+                        } else {
+                            if let Some(new_shapes) = self.update_func.borrow_mut().next() {
+                                buffer.extend(new_shapes);
+                            }
+                            if let Some(shape) = buffer.pop_front() {
+                                shapes.push(shape);
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    painter.ctx().request_repaint();
+                }
+            } else {
+                *last_update = Some(now);
+            }
+        }
+        draw_pixels(self.inner_shapes.borrow().clone(), &painter);
+
         for window in self.control_points.windows(2) {
             if let [start, end] = window {
                 painter.line_segment(
@@ -248,23 +279,6 @@ impl Drawable for Polygon {
             );
         }
     }
-}
-
-fn cross_product(o: Pos2, a: Pos2, b: Pos2) -> f32 {
-    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
-}
-
-fn find_centroid(polygon: &[Pos2]) -> Pos2 {
-    let n = polygon.len();
-    let mut sum_x = 0.0;
-    let mut sum_y = 0.0;
-
-    for point in polygon {
-        sum_x += point.x;
-        sum_y += point.y;
-    }
-
-    Pos2::new(sum_x / n as f32, sum_y / n as f32)
 }
 
 impl PolygonTransform for Polygon {
@@ -442,8 +456,10 @@ impl PolygonTransform for Polygon {
     }
 
     fn test_line(&mut self, start: Pos2, end: Pos2) {
-        self.inner_shapes
-            .extend(lines::dda_line(start, end).flat_map(|vec| {
+        {
+            let mut inner_shapes = self.inner_shapes.borrow_mut();
+
+            inner_shapes.extend(lines::dda_line(start, end).flat_map(|vec| {
                 vec.into_iter().map(|pixel| {
                     Shape::rect_filled(
                         Rect::from_min_size(pixel.pos, Vec2::new(1.0, 1.0)),
@@ -452,14 +468,20 @@ impl PolygonTransform for Polygon {
                     )
                 })
             }));
+        }
         self.find_intersections(start, end);
+    }
+
+    fn reset_fill(&mut self) {
+        self.inner_shapes.borrow_mut().clear();
+        self.update_buffer.borrow_mut().clear();
+        self.update_func = RefCell::new(Box::new(std::iter::empty()));
     }
 
     fn first(&mut self) {
         if self.control_points.len() < 3 {
             return;
         }
-        self.inner_pixels.clear();
 
         let mut edges: Vec<Edge> = Vec::new();
         let n = self.control_points.len();
@@ -502,54 +524,49 @@ impl PolygonTransform for Polygon {
             .map(|p| p.y)
             .fold(f32::NEG_INFINITY, f32::max); // Find max y
 
-        // Filling each scanline
-        while y <= y_max {
-            // Check which edges intersect the current scanline (y)
-            let mut intersections = Vec::new();
+        let func_iter = std::iter::from_fn(move || {
+            if y <= y_max {
+                let mut buffer = Vec::new();
+                // Check which edges intersect the current scanline (y)
+                let mut intersections = Vec::new();
 
-            // Find edges that are active at this y
-            for edge in edges.iter() {
-                if edge.y_min <= y && edge.y_max > y {
-                    let x_intersection = edge.x_min + (y - edge.y_min) as f32 * edge.slope_inverse;
-                    intersections.push(x_intersection);
-                }
-            }
-
-            intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-            for i in (0..intersections.len()).step_by(2) {
-                if i + 1 < intersections.len() {
-                    let x_start = intersections[i].round() as u32;
-                    let x_end = intersections[i + 1].round() as u32;
-
-                    for x in x_start..=x_end {
-                        self.inner_pixels
-                            .push(Pixel::new_black(x as f32, y.floor(), 255));
+                // Find edges that are active at this y
+                for edge in edges.iter() {
+                    if edge.y_min <= y && edge.y_max > y {
+                        let x_intersection =
+                            edge.x_min + (y - edge.y_min) as f32 * edge.slope_inverse;
+                        intersections.push(x_intersection);
                     }
                 }
-            }
 
-            y += 1.0;
-        }
-        let shapes: Vec<Shape> = self
-            .inner_pixels
-            .iter()
-            .map(|pixel| {
-                Shape::rect_filled(
-                    Rect::from_min_size(pixel.pos, Vec2::new(1.0, 1.0)),
-                    0.0,
-                    Color32::BLACK,
-                )
-            })
-            .collect();
-        self.inner_shapes = shapes;
+                intersections.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+                for i in (0..intersections.len()).step_by(2) {
+                    if i + 1 < intersections.len() {
+                        let x_start = intersections[i].round() as u32;
+                        let x_end = intersections[i + 1].round() as u32;
+
+                        for x in x_start..=x_end {
+                            buffer.push(get_rect_shape(x as f32, y.floor()));
+                            // self.inner_shapes.push(get_rect_shape(x as f32, y.floor()));
+                        }
+                    }
+                }
+
+                y += 1.0;
+                Some(buffer)
+            } else {
+                None
+            }
+        });
+
+        self.update_func = RefCell::new(Box::new(func_iter));
     }
 
     fn second(&mut self) {
         if self.control_points.len() < 3 {
             return;
         }
-        self.inner_pixels.clear();
 
         let mut edges: Vec<Edge> = Vec::new();
         let n = self.control_points.len();
@@ -590,209 +607,198 @@ impl PolygonTransform for Polygon {
         let mut active_edges: Vec<Edge> = Vec::new();
 
         // Filling each scanline
-        while y <= y_max {
-            // Move edges from global edge list to active edge list
-            edges.retain(|edge| {
-                if edge.y_min as u32 == y as u32 {
-                    active_edges.push(edge.clone());
-                    false
-                } else {
-                    true
-                }
-            });
+        let func_iter = std::iter::from_fn(move || {
+            if y <= y_max {
+                let mut buffer = Vec::new();
+                // Move edges from global edge list to active edge list
+                edges.retain(|edge| {
+                    if edge.y_min as u32 == y as u32 {
+                        active_edges.push(edge.clone());
+                        false
+                    } else {
+                        true
+                    }
+                });
 
-            // Remove edges where y reaches y_max
-            active_edges.retain(|edge| edge.y_max as u32 > y as u32);
+                // Remove edges where y reaches y_max
+                active_edges.retain(|edge| edge.y_max as u32 > y as u32);
 
-            // Sort active edges by x_min
-            active_edges.sort_by(|a, b| a.x_min.partial_cmp(&b.x_min).unwrap());
+                // Sort active edges by x_min
+                active_edges.sort_by(|a, b| a.x_min.partial_cmp(&b.x_min).unwrap());
 
-            let intersections: Vec<f32> = active_edges.iter().map(|edge| edge.x_min).collect();
+                let intersections: Vec<f32> = active_edges.iter().map(|edge| edge.x_min).collect();
 
-            for i in (0..intersections.len()).step_by(2) {
-                if i + 1 < intersections.len() {
-                    let x_start = intersections[i].round() as u32;
-                    let x_end = intersections[i + 1].round() as u32;
+                for i in (0..intersections.len()).step_by(2) {
+                    if i + 1 < intersections.len() {
+                        let x_start = intersections[i].round() as u32;
+                        let x_end = intersections[i + 1].round() as u32;
 
-                    for x in x_start..=x_end {
-                        self.inner_pixels
-                            .push(Pixel::new_black(x as f32, y.floor(), 255));
+                        for x in x_start..=x_end {
+                            buffer.push(get_rect_shape(x as f32, y.floor()));
+                            // self.inner_shapes.push(get_rect_shape(x as f32, y.floor()));
+                        }
                     }
                 }
+
+                // Update x_min for next scanline
+                for edge in active_edges.iter_mut() {
+                    edge.x_min += edge.slope_inverse;
+                }
+
+                y += 1.0;
+                Some(buffer)
+            } else {
+                None
             }
+        });
 
-            // Update x_min for next scanline
-            for edge in active_edges.iter_mut() {
-                edge.x_min += edge.slope_inverse;
-            }
-
-            y += 1.0;
-        }
-
-        let shapes: Vec<Shape> = self
-            .inner_pixels
-            .iter()
-            .map(|pixel| {
-                Shape::rect_filled(
-                    Rect::from_min_size(pixel.pos, Vec2::new(1.0, 1.0)),
-                    0.0,
-                    Color32::BLACK,
-                )
-            })
-            .collect();
-        self.inner_shapes = shapes;
+        self.update_func = RefCell::new(Box::new(func_iter));
     }
 
     fn third(&mut self) {
         let mut visited = HashSet::new();
-        let step = 1.0;
+        let step = 0.000001;
         let start = find_centroid(&self.control_points);
         let sx = start.x as i32;
         let sy = start.y as i32;
         let mut stack = vec![(sx, sy)];
-        while let Some((x, y)) = stack.pop() {
-            // println!(":{}", times);
-            if visited.contains(&(x, y)) {
-                continue;
+        let polygon = self.control_points.clone();
+        let func_iter = std::iter::from_fn(move || {
+            loop {
+                if let Some((x, y)) = stack.pop() {
+                    if visited.contains(&(x, y)) {
+                        continue;
+                    }
+
+                    let p = Pos2 {
+                        x: x as f32,
+                        y: y as f32,
+                    };
+                    if is_on_boundary(&polygon, p, step / 2.0) || !is_inside(&polygon, p) {
+                        continue;
+                    }
+
+                    visited.insert((x, y));
+                    // self.inner_shapes.push(get_rect_shape(p.x, p.y));
+
+                    stack.push((x + 1, y));
+                    stack.push((x - 1, y));
+                    stack.push((x, y + 1));
+                    stack.push((x, y - 1));
+                    return Some(vec![get_rect_shape(p.x, p.y)]);
+                } else {
+                    return None;
+                }
             }
+        });
 
-            let p = Pos2 {
-                x: x as f32,
-                y: y as f32,
-            };
-            if self.is_on_boundary(p, step / 2.0) || !self.is_inside(p) {
-                continue;
-            }
-            // println!("after boundary if:{}", times);
-
-            visited.insert((x, y));
-            // println!("after inserted visited:{}", times);
-            self.inner_pixels.push(Pixel::new_pos2(p, (255, 0, 0, 123)));
-
-            // Рекурсивное заполнение в 4 стороны
-            stack.push((x + 1, y));
-            stack.push((x - 1, y));
-            stack.push((x, y + 1));
-            stack.push((x, y - 1));
-            // println!("after 4 push:{}", times);
-        }
-        println!("Left");
-        let shapes: Vec<Shape> = self
-            .inner_pixels
-            .iter()
-            .map(|pixel| {
-                Shape::rect_filled(
-                    Rect::from_min_size(pixel.pos, Vec2::new(1.0, 1.0)),
-                    0.0,
-                    Color32::BLACK,
-                )
-            })
-            .collect();
-        self.inner_shapes = shapes;
+        self.update_func = RefCell::new(Box::new(func_iter));
     }
 
     fn fourth(&mut self) {
-        let step = 1.0;
+        let step = 0.000001;
         let start = find_centroid(&self.control_points);
         let sx = start.x as i32;
         let sy = start.y as i32;
         let mut stack = vec![(sx, sy)];
         let mut visited = HashSet::new();
+        let polygon = self.control_points.clone();
+        let func_iter = std::iter::from_fn(move || {
+            loop {
+                if let Some((x, y)) = stack.pop() {
+                    if visited.contains(&(x, y)) {
+                        continue;
+                    }
 
-        while let Some((x, y)) = stack.pop() {
-            if visited.contains(&(x, y)) {
-                continue;
-            }
+                    let p = Pos2 {
+                        x: x as f32,
+                        y: y as f32,
+                    };
 
-            let p = Pos2 {
-                x: x as f32,
-                y: y as f32,
-            };
+                    if is_on_boundary(&polygon, p, step / 2.0) || !is_inside(&polygon, p) {
+                        continue;
+                    }
+                    let mut buffer = vec![];
 
-            if self.is_on_boundary(p, step / 2.0) || !self.is_inside(p) {
-                continue;
-            }
+                    visited.insert((x, y));
+                    buffer.push(get_rect_shape(p.x, p.y));
+                    // self.inner_shapes.push(get_rect_shape(p.x, p.y));
 
-            visited.insert((x, y));
-            self.inner_pixels.push(Pixel::new_pos2(p, (255, 0, 0, 123)));
+                    // Fill left and right
+                    let mut left = x;
+                    while !is_on_boundary(
+                        &polygon,
+                        Pos2 {
+                            x: (left - 1) as f32,
+                            y: y as f32,
+                        },
+                        step / 2.0,
+                    ) && is_inside(
+                        &polygon,
+                        Pos2 {
+                            x: (left - 1) as f32,
+                            y: y as f32,
+                        },
+                    ) {
+                        left -= 1;
+                        if !visited.contains(&(left, y)) {
+                            visited.insert((left, y));
+                            buffer.push(get_rect_shape(left as f32, y as f32));
+                            // self.inner_shapes
+                            // .push(get_rect_shape(left as f32, y as f32));
+                        }
+                    }
 
-            // Fill left and right
-            let mut left = x;
-            while !self.is_on_boundary(
-                Pos2 {
-                    x: (left - 1) as f32,
-                    y: y as f32,
-                },
-                step / 2.0,
-            ) && self.is_inside(Pos2 {
-                x: (left - 1) as f32,
-                y: y as f32,
-            }) {
-                left -= 1;
-                // let p_left = Pos2 {
-                //     x: left as f32,
-                //     y: y as f32,
-                // };
-                if !visited.contains(&(left, y)) {
-                    visited.insert((left, y));
-                    // self.inner_pixels
-                    //     .push(Pixel::new_pos2(p_left, (255, 0, 0, 123)));
-                    self.inner_shapes.push(get_rect_shape(left as f32, y as f32));
+                    let mut right = x;
+                    while !is_on_boundary(
+                        &polygon,
+                        Pos2 {
+                            x: (right + 1) as f32,
+                            y: y as f32,
+                        },
+                        step / 2.0,
+                    ) && is_inside(
+                        &polygon,
+                        Pos2 {
+                            x: (right + 1) as f32,
+                            y: y as f32,
+                        },
+                    ) {
+                        right += 1;
+                        if !visited.contains(&(right, y)) {
+                            visited.insert((right, y));
+                            buffer.push(get_rect_shape(right as f32, y as f32))
+                            // self.inner_shapes
+                            //     .push(get_rect_shape(right as f32, y as f32));
+                        }
+                    }
+
+                    // Check upper and lower rows for new seeds
+                    let mut add_to_stack = |x, y| {
+                        // Check if the current pixel is within bounds and unvisited
+                        let p_check = Pos2 {
+                            x: x as f32,
+                            y: y as f32,
+                        };
+                        if !visited.contains(&(x, y)) && is_inside(&polygon, p_check) {
+                            stack.push((x, y));
+                        }
+                    };
+
+                    // Check the region around the filled row to find unfilled pixels
+                    for dy in (-1..=1).step_by(2) {
+                        // Check one row above, one below, and the current row
+                        for dx in left..=right {
+                            add_to_stack(dx, y + dy);
+                        }
+                    }
+                    return Some(buffer);
+                } else {
+                    return None;
                 }
             }
-
-            let mut right = x;
-            while !self.is_on_boundary(
-                Pos2 {
-                    x: (right + 1) as f32,
-                    y: y as f32,
-                },
-                step / 2.0,
-            ) && self.is_inside(Pos2 {
-                x: (right + 1) as f32,
-                y: y as f32,
-            }) {
-                right += 1;
-                // let p_right = Pos2 {
-                //     x: right as f32,
-                //     y: y as f32,
-                // };
-                if !visited.contains(&(right, y)) {
-                    visited.insert((right, y));
-                    // self.inner_pixels
-                    //     .push(Pixel::new_pos2(p_right, (255, 0, 0, 123)));
-                    self.inner_shapes.push(get_rect_shape(right as f32, y as f32));
-                }
-            }
-
-            // Check upper and lower rows for new seeds
-            let mut add_to_stack = |x, y| {
-                // Check if the current pixel is within bounds and unvisited
-                let p_check = Pos2 {
-                    x: x as f32,
-                    y: y as f32,
-                };
-                if !visited.contains(&(x, y)) && self.is_inside(p_check) {
-                    stack.push((x, y));
-                }
-            };
-
-            // Check the region around the filled row to find unfilled pixels
-            for dy in (-1..=1).step_by(2) {
-                // Check one row above, one below, and the current row
-                for dx in left..=right {
-                    add_to_stack(dx, y + dy);
-                }
-            }
-        }
-
-        // // Convert the inner pixels to shapes
-        // let shapes: Vec<Shape> = self
-        //     .inner_pixels
-        //     .iter()
-        //     .map(|pixel| get_rect_shape(pixel.pos.x, pixel.pos.y))
-        //     .collect();
-        // self.inner_shapes = shapes;
+        });
+        self.update_func = RefCell::new(Box::new(func_iter));
     }
 }
 
@@ -802,6 +808,15 @@ struct Edge {
     y_min: f32,
     x_min: f32,
     slope_inverse: f32,
+}
+
+fn distance_to_line_segment(p1: Pos2, p2: Pos2, point: Pos2) -> f32 {
+    let v = p2 - p1;
+    let u = point - p1;
+    let t = (u.x * v.x + u.y * v.y) / (v.x * v.x + v.y * v.y);
+    let t_clamped = t.clamp(0.0, 1.0);
+    let closest = Pos2::new(p1.x + t_clamped * v.x, p1.y + t_clamped * v.y);
+    point.distance(closest)
 }
 
 fn get_rect_shape(x: f32, y: f32) -> Shape {
@@ -814,35 +829,6 @@ fn get_rect_shape(x: f32, y: f32) -> Shape {
 
 fn draw_pixels(shapes: Vec<Shape>, painter: &Painter) {
     painter.extend(shapes);
-}
-
-// Функция для вычисления расстояния от точки до отрезка
-fn distance_point_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
-    let ab = Pos2 {
-        x: b.x - a.x,
-        y: b.y - a.y,
-    };
-    let ap = Pos2 {
-        x: p.x - a.x,
-        y: p.y - a.y,
-    };
-    let bp = Pos2 {
-        x: p.x - b.x,
-        y: p.y - b.y,
-    };
-
-    let dot1 = ab.x * ap.x + ab.y * ap.y;
-    let dot2 = ab.x * bp.x + ab.y * bp.y;
-
-    if dot1 <= 0.0 {
-        return ((p.x - a.x).powi(2) + (p.y - a.y).powi(2)).sqrt();
-    }
-    if dot2 >= 0.0 {
-        return ((p.x - b.x).powi(2) + (p.y - b.y).powi(2)).sqrt();
-    }
-
-    let cross = ab.x * ap.y - ab.y * ap.x;
-    (cross.abs() / ((b.x - a.x).hypot(b.y - a.y))).abs()
 }
 
 fn intersect(start: Pos2, end: Pos2, start_edge: Pos2, end_edge: Pos2) -> Option<Pos2> {
@@ -867,3 +853,76 @@ fn intersect(start: Pos2, end: Pos2, start_edge: Pos2, end_edge: Pos2) -> Option
         return None;
     }
 }
+
+fn cross_product(o: Pos2, a: Pos2, b: Pos2) -> f32 {
+    (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+}
+
+fn find_centroid(polygon: &[Pos2]) -> Pos2 {
+    let n = polygon.len();
+    let mut sum_x = 0.0;
+    let mut sum_y = 0.0;
+
+    for point in polygon {
+        sum_x += point.x;
+        sum_y += point.y;
+    }
+
+    Pos2::new(sum_x / n as f32, sum_y / n as f32)
+}
+
+fn is_on_boundary(polygon: &[Pos2], p: Pos2, eps: f32) -> bool {
+    polygon.windows(2).any(|pair| {
+        let (a, b) = (pair[0], pair[1]);
+        distance_to_line_segment(p, a, b) < eps
+    })
+}
+
+fn is_inside(polygon: &[Pos2], point: Pos2) -> bool {
+    let mut crossings = 0;
+    let n = polygon.len();
+
+    for i in 0..n {
+        let p1 = polygon[i];
+        let p2 = polygon[(i + 1) % n];
+
+        if point.y > p1.y.min(p2.y) && point.y <= p1.y.max(p2.y) {
+            let x_intersection = (point.y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y) + p1.x;
+            if point.x < x_intersection {
+                crossings += 1;
+            }
+        }
+    }
+
+    crossings % 2 != 0
+}
+
+// // Функция для вычисления расстояния от точки до отрезка
+// fn distance_point_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
+//     let ab = Pos2 {
+//         x: b.x - a.x,
+//         y: b.y - a.y,
+//     };
+//     let ap = Pos2 {
+//         x: p.x - a.x,
+//         y: p.y - a.y,
+//     };
+//     let bp = Pos2 {
+//         x: p.x - b.x,
+//         y: p.y - b.y,
+//     };
+//
+//     let dot1 = ab.x * ap.x + ab.y * ap.y;
+//     let dot2 = ab.x * bp.x + ab.y * bp.y;
+//
+//     if dot1 <= 0.0 {
+//         return ((p.x - a.x).powi(2) + (p.y - a.y).powi(2)).sqrt();
+//     }
+//     if dot2 >= 0.0 {
+//         return ((p.x - b.x).powi(2) + (p.y - b.y).powi(2)).sqrt();
+//     }
+//
+//     let cross = ab.x * ap.y - ab.y * ap.x;
+//     (cross.abs() / ((b.x - a.x).hypot(b.y - a.y))).abs()
+// }
+//

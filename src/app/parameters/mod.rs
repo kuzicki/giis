@@ -15,6 +15,8 @@ pub enum ParameterState {
     Curve(figure_parameters::Curve),
     Object(figure_parameters::Object),
     Polygon(figure_parameters::Polygon),
+    Delone(figure_parameters::Delone),
+    Voronoi(figure_parameters::Voronoi)
 }
 
 impl Default for ParameterState {
@@ -49,6 +51,8 @@ impl From<&Action> for ParameterState {
             },
             LoadObject => ps::Object(fp::Object::new()),
             DrawPolygon => ps::Polygon(fp::Polygon::new()),
+            DrawDelone => ps::Delone(fp::Delone::new()),
+            DrawaVoronoi => ps::Voronoi(fp::Voronoi::new())
         }
     }
 }
@@ -192,6 +196,8 @@ pub enum Action {
     DrawBSpline,
     LoadObject,
     DrawPolygon,
+    DrawDelone,
+    DrawaVoronoi
 }
 
 impl Action {
@@ -209,6 +215,8 @@ impl Action {
             Action::DrawBSpline,
             Action::LoadObject,
             Action::DrawPolygon,
+            Action::DrawDelone,
+            Action::DrawaVoronoi
         ]
     }
 
@@ -227,6 +235,8 @@ impl Action {
             act::DrawBSpline => "B-spline curve",
             act::LoadObject => "3D object transforms",
             act::DrawPolygon => "Polygons",
+            act::DrawaVoronoi => "Voronoi",
+            act::DrawDelone => "Delone"
         }
     }
 }

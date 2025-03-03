@@ -18,6 +18,8 @@ impl ClickAction for ParameterState {
             ps::Curve(params) => params.handle_click(pos),
             ps::Object(params) => params.handle_click(pos),
             ps::Polygon(params) => params.handle_click(pos),
+            ps::Delone(params) => params.handle_click(pos),
+            ps::Voronoi(params) => params.handle_click(pos),
         }
     }
 }
@@ -90,6 +92,20 @@ impl ClickAction for figure_parameters::Object {
 }
 
 impl ClickAction for figure_parameters::Polygon {
+    fn handle_click(&mut self, pos: egui::Pos2) -> bool {
+        self.points.push(pos);
+        false
+    }
+}
+
+impl ClickAction for figure_parameters::Delone {
+    fn handle_click(&mut self, pos: egui::Pos2) -> bool {
+        self.points.push(pos);
+        false
+    }
+}
+
+impl ClickAction for figure_parameters::Voronoi {
     fn handle_click(&mut self, pos: egui::Pos2) -> bool {
         self.points.push(pos);
         false

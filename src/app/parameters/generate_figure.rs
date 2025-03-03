@@ -1,4 +1,6 @@
-use super::super::figure::{Circle, Curve, Ellips, Hyperbola, Line, Object, Parabola, Polygon};
+use super::super::figure::{
+    Circle, Curve, Delone, Ellips, Hyperbola, Line, Object, Parabola, Polygon, Voronoi,
+};
 use super::figure_parameters;
 use super::figure_parameters::LineType;
 use super::Figure;
@@ -24,6 +26,8 @@ impl GenerateFigure for ParameterState {
             ps::Curve(params) => params.generate_figure(),
             ps::Object(params) => params.generate_figure(),
             ps::Polygon(params) => params.generate_figure(),
+            ps::Delone(params) => params.generate_figure(),
+            ps::Voronoi(params) => params.generate_figure(),
         }
     }
 }
@@ -173,6 +177,24 @@ impl GenerateFigure for figure_parameters::Polygon {
     fn generate_figure(&mut self) -> Option<Box<dyn Figure>> {
         if self.points.len() > 1 {
             return Some(Box::new(Polygon::new(self.points.clone())));
+        }
+        None
+    }
+}
+
+impl GenerateFigure for figure_parameters::Delone {
+    fn generate_figure(&mut self) -> Option<Box<dyn Figure>> {
+        if self.points.len() > 1 {
+            return Some(Box::new(Delone::new(self.points.clone())));
+        }
+        None
+    }
+}
+
+impl GenerateFigure for figure_parameters::Voronoi {
+    fn generate_figure(&mut self) -> Option<Box<dyn Figure>> {
+        if self.points.len() > 1 {
+            return Some(Box::new(Voronoi::new(self.points.clone())));
         }
         None
     }

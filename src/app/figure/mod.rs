@@ -10,6 +10,8 @@ mod line;
 mod object;
 mod parabola;
 mod polygon;
+mod delone;
+mod voronoi;
 pub use circle::Circle;
 pub use curve::{Curve, CurveType};
 pub use ellips::Ellips;
@@ -18,6 +20,8 @@ pub use line::Line;
 pub use object::Object;
 pub use parabola::Parabola;
 pub use polygon::Polygon;
+pub use delone::Delone;
+pub use voronoi::Voronoi;
 
 pub trait Figure: Drawable {
     fn as_selectable(&self) -> Option<&dyn Selectable> {
@@ -72,6 +76,7 @@ pub trait PolygonTransform: Selectable {
     fn second(&mut self);
     fn third(&mut self);
     fn fourth(&mut self);
+    fn reset_fill(&mut self);
 }
 
 pub trait Selectable: Figure {

@@ -118,3 +118,27 @@ impl Polygon {
         }
     }
 }
+
+pub struct Delone {
+    pub points: Vec<egui::Pos2>
+}
+
+impl Delone {
+    pub fn new() -> Self {
+        Self {
+            points: vec![]
+        }
+    }
+}
+
+pub struct Voronoi {
+    pub points: Vec<egui::Pos2>
+}
+
+impl Voronoi {
+    pub fn new() -> Self {
+        Self {
+            points: vec![]
+        }
+    }
+}

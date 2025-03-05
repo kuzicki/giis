@@ -529,6 +529,33 @@ $$
 
 ## Листинг кода
 ```rust
+    fn test_convex(&self) -> bool {
+        if self.control_points.len() < 3 {
+            return false;
+        }
+
+        let mut last_sign: Option<bool> = None;
+        let n = self.control_points.len();
+        for i in 0..n {
+            let o = self.control_points[i];
+            let a = self.control_points[(i + 1) % n];
+            let b = self.control_points[(i + 2) % n];
+
+            let cp = cross_product(o, a, b);
+
+            if cp != 0.0 {
+                let current_sign = cp > 0.0;
+
+                if last_sign.is_none() {
+                    last_sign = Some(current_sign);
+                } else if last_sign != Some(current_sign) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
 ```
 
 ### Вывод
@@ -574,6 +601,44 @@ $$
 
 ## Листинг кода
 ```rust
+    fn third(&mut self) { // Простой алгоритм заполнения с затравкой
+        let mut visited = HashSet::new();
+        let step = 0.000001;
+        let start = find_centroid(&self.control_points);
+        let sx = start.x as i32;
+        let sy = start.y as i32;
+        let mut stack = vec![(sx, sy)];
+        let polygon = self.control_points.clone();
+        let func_iter = std::iter::from_fn(move || {
+            loop {
+                if let Some((x, y)) = stack.pop() {
+                    if visited.contains(&(x, y)) {
+                        continue;
+                    }
+
+                    let p = Pos2 {
+                        x: x as f32,
+                        y: y as f32,
+                    };
+                    if is_on_boundary(&polygon, p, step / 2.0) || !is_inside(&polygon, p) {
+                        continue;
+                    }
+
+                    visited.insert((x, y));
+
+                    stack.push((x + 1, y));
+                    stack.push((x - 1, y));
+                    stack.push((x, y + 1));
+                    stack.push((x, y - 1));
+                    return Some(vec![get_rect_shape(p.x, p.y)]);
+                } else {
+                    return None;
+                }
+            }
+        });
+
+        self.update_func = RefCell::new(Box::new(func_iter));
+    }
 ```
 
 ### Вывод

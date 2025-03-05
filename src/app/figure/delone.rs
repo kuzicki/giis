@@ -1,20 +1,19 @@
-use super::{draw_pixels, Drawable, Figure};
-use crate::pixel::Pixel;
+use super::{Drawable, Figure};
 use eframe::egui::Pos2;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, PartialEq)]
-struct Triangle {
-    a: Pos2,
-    b: Pos2,
-    c: Pos2,
+pub struct Triangle {
+    pub a: Pos2,
+    pub b: Pos2,
+    pub c: Pos2,
 }
 
 #[derive(Clone)]
-struct Edge {
-    a: Pos2,
-    b: Pos2,
+pub struct Edge {
+    pub a: Pos2,
+    pub b: Pos2,
 }
 
 impl Edge {
@@ -23,6 +22,10 @@ impl Edge {
             std::mem::swap(&mut a, &mut b);
         }
         Self { a, b }
+    }
+
+    pub fn equal(&self, other: &Self) -> bool {
+        (self.a == other.a && self.b == other.b) || (self.a == other.b && self.b == other.a)
     }
 }
 
@@ -44,7 +47,7 @@ impl Hash for Edge {
 }
 
 impl Triangle {
-    fn get_edges(&self) -> [Edge; 3] {
+    pub fn get_edges(&self) -> [Edge; 3] {
         [
             Edge::new(self.a, self.b),
             Edge::new(self.b, self.c),
@@ -52,11 +55,11 @@ impl Triangle {
         ]
     }
 
-    fn is_point_inside(&self, point: Pos2) -> bool {
+    fn is_point_inside_circ(&self, point: Pos2) -> bool {
         Self::in_circumcircle(self.a.clone(), self.b.clone(), self.c.clone(), point)
     }
 
-    fn is_counterclockwise(a: &Pos2, b: &Pos2, c: &Pos2) -> bool {
+    pub fn is_counterclockwise(a: &Pos2, b: &Pos2, c: &Pos2) -> bool {
         (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) > 0.0
     }
 
@@ -88,11 +91,11 @@ impl Delone {
     pub fn new(points: Vec<Pos2>) -> Self {
         let mut delone = Self { triangles: vec![] };
         let super_triangle = Triangle {
-            a: Pos2 { x: -300.0, y: 0.0 },
-            b: Pos2 { x: 1000.0, y: 0.0 },
+            a: Pos2 { x: -600.0, y: 0.0 },
+            b: Pos2 { x: 2000.0, y: 0.0 },
             c: Pos2 {
-                x: 650.0,
-                y: 2000.0,
+                x: 1000.0,
+                y: 4000.0,
             },
         };
         delone.triangles.push(super_triangle);
@@ -108,7 +111,6 @@ impl Delone {
                         || super_edges.b == edges.a
                         || super_edges.b == edges.b
                     {
-                        println!("Broke");
                         bad_triangles.push(*t);
                         break 'outer;
                     }
@@ -123,6 +125,10 @@ impl Delone {
         delone
     }
 
+    pub(super) fn get_triangles(&self) -> &[Triangle] {
+        &self.triangles
+    }
+
     fn add_point(&mut self, point: Pos2) {
         let mut bad_triangle_edges = HashMap::new();
         let mut bad_triangles = vec![];
@@ -131,7 +137,7 @@ impl Delone {
         };
 
         for t in self.triangles.iter() {
-            if t.is_point_inside(point) {
+            if t.is_point_inside_circ(point) {
                 bad_triangles.push(*t);
                 for edge in t.get_edges() {
                     insert_or_increment(&mut bad_triangle_edges, edge);
@@ -161,7 +167,6 @@ impl Figure for Delone {}
 impl Drawable for Delone {
     fn draw(&self, painter: &eframe::egui::Painter) {
         for triangle in &self.triangles {
-            // Draw the edges of the triangle by connecting the three points a, b, and c
             painter.add(eframe::egui::Shape::line_segment(
                 [triangle.a, triangle.b],
                 eframe::egui::Stroke::new(2.0, eframe::egui::Color32::WHITE),

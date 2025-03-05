@@ -1,5 +1,6 @@
 use crate::pixel::Pixel;
 use eframe::egui::{Color32, InputState, Painter, Pos2, Rect, Vec2};
+
 #[macro_use]
 mod macros;
 mod circle;
@@ -12,6 +13,7 @@ mod parabola;
 mod polygon;
 mod delone;
 mod voronoi;
+
 pub use circle::Circle;
 pub use curve::{Curve, CurveType};
 pub use ellips::Ellips;
@@ -22,6 +24,7 @@ pub use parabola::Parabola;
 pub use polygon::Polygon;
 pub use delone::Delone;
 pub use voronoi::Voronoi;
+pub use delone::Triangle;
 
 pub trait Figure: Drawable {
     fn as_selectable(&self) -> Option<&dyn Selectable> {
@@ -108,7 +111,7 @@ pub trait Drawable {
     fn draw(&self, painter: &Painter);
 }
 
-pub(self) fn draw_pixels(pixels: &Vec<Pixel>, painter: &Painter) {
+fn draw_pixels(pixels: &Vec<Pixel>, painter: &Painter) {
     for pixel in pixels {
         let color =
             Color32::from_rgba_premultiplied(pixel.red, pixel.green, pixel.blue, pixel.intensity);

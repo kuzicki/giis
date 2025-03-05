@@ -54,7 +54,6 @@ impl Polygon {
         })
     }
 
-    // Проверка, внутри ли точка (метод чётности пересечений)
     fn is_inside(&self, point: Pos2) -> bool {
         let mut crossings = 0;
         let n = self.control_points.len();
@@ -260,21 +259,17 @@ impl Drawable for Polygon {
             let a = self.control_points[i];
             let b = self.control_points[(i + 1) % n];
 
-            // Calculate the midpoint of the edge (between a and b)
             let midpoint = Pos2::new((a.x + b.x) / 2.0, (a.y + b.y) / 2.0);
 
-            // Get the internal normal vector
             let normal = self.normals[i];
 
-            // Scale the normal for better visibility
-            let normal_end = midpoint + normal * 20.0; // Scale by 20 for better visibility
+            let normal_end = midpoint + normal * 20.0; 
 
-            // Draw the normal
             painter.line_segment(
                 [midpoint, normal_end],
                 eframe::egui::Stroke {
                     width: Self::THICKNESS,
-                    color: eframe::egui::Color32::from_rgb(255, 0, 0), // Red color for normals
+                    color: eframe::egui::Color32::from_rgb(255, 0, 0),
                 },
             );
         }
@@ -320,16 +315,12 @@ impl PolygonTransform for Polygon {
             let a = polygon[i];
             let b = polygon[(i + 1) % n];
 
-            // Get the edge vector
             let edge = b - a;
 
-            // Find the normal to this edge (perpendicular vector)
             let normal = Vec2::new(-edge.y, edge.x).normalized();
 
-            // Check if the normal points towards the centroid (ensure inward direction)
             let to_centroid = Vec2::new(center.x - a.x, center.y - a.y);
             if normal.dot(to_centroid) < 0.0 {
-                // If the normal does not point toward the centroid, invert it
                 normals.push(Vec2::new(-normal.x, -normal.y));
             } else {
                 normals.push(normal);
@@ -343,7 +334,6 @@ impl PolygonTransform for Polygon {
             return;
         }
 
-        // Step 1: Find the point with the lowest y-coordinate (or leftmost if tie)
         let min_idx = self
             .control_points
             .iter()
@@ -358,7 +348,6 @@ impl PolygonTransform for Polygon {
 
         let pivot = self.control_points[min_idx];
 
-        // Step 2: Sort the points by polar angle with respect to pivot
         let mut sorted_points = self.control_points.clone();
         sorted_points.sort_by(|a, b| {
             let cross = cross_product(pivot, *a, *b);
@@ -367,14 +356,12 @@ impl PolygonTransform for Polygon {
             } else if cross < 0.0 {
                 std::cmp::Ordering::Greater
             } else {
-                // If collinear, sort by distance from pivot (closer points first)
                 let dist_a = (a.x - pivot.x).hypot(a.y - pivot.y);
                 let dist_b = (b.x - pivot.x).hypot(b.y - pivot.y);
                 dist_a.partial_cmp(&dist_b).unwrap()
             }
         });
 
-        // Step 3: Build the convex hull using a stack
         let mut hull = Vec::new();
         for &point in &sorted_points {
             while hull.len() >= 2 {
@@ -382,7 +369,7 @@ impl PolygonTransform for Polygon {
                 let second_last = hull[hull.len() - 2];
 
                 if cross_product(second_last, last, point) <= 0.0 {
-                    hull.pop(); // Remove last point if it's a right turn or collinear
+                    hull.pop();
                 } else {
                     break;
                 }
@@ -390,7 +377,6 @@ impl PolygonTransform for Polygon {
             hull.push(point);
         }
 
-        // Update the polygon to store only the convex hull
         self.control_points = hull;
     }
 
@@ -402,7 +388,6 @@ impl PolygonTransform for Polygon {
         let mut hull = Vec::new();
         let n = self.control_points.len();
 
-        // Step 1: Find the leftmost point (smallest x, then smallest y)
         let mut leftmost_idx = 0;
         for i in 1..n {
             if self.control_points[i].x < self.control_points[leftmost_idx].x
@@ -416,10 +401,8 @@ impl PolygonTransform for Polygon {
         let mut current = leftmost_idx;
 
         loop {
-            // Add the current point to the hull
             hull.push(self.control_points[current]);
 
-            // Step 2: Find the most counterclockwise point
             let mut next = (current + 1) % n;
             for i in 0..n {
                 let cross = cross_product(
@@ -428,8 +411,7 @@ impl PolygonTransform for Polygon {
                     self.control_points[i],
                 );
 
-                // If `i` is more counterclockwise, update `next`
-                if cross > 0.0 // Changed from < to >
+                if cross > 0.0
     || (cross == 0.0
         && (self.control_points[i].x - self.control_points[current].x)
             .hypot(self.control_points[i].y - self.control_points[current].y)
@@ -440,14 +422,12 @@ impl PolygonTransform for Polygon {
                 }
             }
 
-            // Stop when we wrap around to the first point
             if next == leftmost_idx {
                 break;
             }
             current = next;
         }
 
-        // Update the polygon to store only the convex hull
         self.control_points = hull;
     }
 
@@ -486,13 +466,12 @@ impl PolygonTransform for Polygon {
         let mut edges: Vec<Edge> = Vec::new();
         let n = self.control_points.len();
 
-        // Creating edges
         for i in 0..n {
             let p1 = self.control_points[i];
             let p2 = self.control_points[(i + 1) % n];
 
             if p1.y == p2.y {
-                continue; // Ignore horizontal edges
+                continue;
             }
 
             let (p1, p2) = if p1.y < p2.y { (p1, p2) } else { (p2, p1) };
@@ -506,7 +485,6 @@ impl PolygonTransform for Polygon {
             });
         }
 
-        // Sort edges by x_min
         edges.sort_by(|a, b| {
             a.x_min
                 .partial_cmp(&b.x_min)
@@ -527,10 +505,8 @@ impl PolygonTransform for Polygon {
         let func_iter = std::iter::from_fn(move || {
             if y <= y_max {
                 let mut buffer = Vec::new();
-                // Check which edges intersect the current scanline (y)
                 let mut intersections = Vec::new();
 
-                // Find edges that are active at this y
                 for edge in edges.iter() {
                     if edge.y_min <= y && edge.y_max > y {
                         let x_intersection =
@@ -548,7 +524,6 @@ impl PolygonTransform for Polygon {
 
                         for x in x_start..=x_end {
                             buffer.push(get_rect_shape(x as f32, y.floor()));
-                            // self.inner_shapes.push(get_rect_shape(x as f32, y.floor()));
                         }
                     }
                 }
@@ -571,13 +546,12 @@ impl PolygonTransform for Polygon {
         let mut edges: Vec<Edge> = Vec::new();
         let n = self.control_points.len();
 
-        // Creating edges
         for i in 0..n {
             let p1 = self.control_points[i];
             let p2 = self.control_points[(i + 1) % n];
 
             if p1.y == p2.y {
-                continue; // Ignore horizontal edges
+                continue;
             }
 
             let (p1, p2) = if p1.y < p2.y { (p1, p2) } else { (p2, p1) };
@@ -591,7 +565,6 @@ impl PolygonTransform for Polygon {
             });
         }
 
-        // Sort edges by y_min, then by x_min
         edges.sort_by(|a, b| {
             a.y_min
                 .partial_cmp(&b.y_min)
@@ -606,11 +579,9 @@ impl PolygonTransform for Polygon {
             .fold(f32::NEG_INFINITY, f32::max);
         let mut active_edges: Vec<Edge> = Vec::new();
 
-        // Filling each scanline
         let func_iter = std::iter::from_fn(move || {
             if y <= y_max {
                 let mut buffer = Vec::new();
-                // Move edges from global edge list to active edge list
                 edges.retain(|edge| {
                     if edge.y_min as u32 == y as u32 {
                         active_edges.push(edge.clone());
@@ -620,10 +591,8 @@ impl PolygonTransform for Polygon {
                     }
                 });
 
-                // Remove edges where y reaches y_max
                 active_edges.retain(|edge| edge.y_max as u32 > y as u32);
 
-                // Sort active edges by x_min
                 active_edges.sort_by(|a, b| a.x_min.partial_cmp(&b.x_min).unwrap());
 
                 let intersections: Vec<f32> = active_edges.iter().map(|edge| edge.x_min).collect();
@@ -635,12 +604,10 @@ impl PolygonTransform for Polygon {
 
                         for x in x_start..=x_end {
                             buffer.push(get_rect_shape(x as f32, y.floor()));
-                            // self.inner_shapes.push(get_rect_shape(x as f32, y.floor()));
                         }
                     }
                 }
 
-                // Update x_min for next scanline
                 for edge in active_edges.iter_mut() {
                     edge.x_min += edge.slope_inverse;
                 }
@@ -679,7 +646,6 @@ impl PolygonTransform for Polygon {
                     }
 
                     visited.insert((x, y));
-                    // self.inner_shapes.push(get_rect_shape(p.x, p.y));
 
                     stack.push((x + 1, y));
                     stack.push((x - 1, y));
@@ -722,9 +688,7 @@ impl PolygonTransform for Polygon {
 
                     visited.insert((x, y));
                     buffer.push(get_rect_shape(p.x, p.y));
-                    // self.inner_shapes.push(get_rect_shape(p.x, p.y));
 
-                    // Fill left and right
                     let mut left = x;
                     while !is_on_boundary(
                         &polygon,
@@ -744,8 +708,6 @@ impl PolygonTransform for Polygon {
                         if !visited.contains(&(left, y)) {
                             visited.insert((left, y));
                             buffer.push(get_rect_shape(left as f32, y as f32));
-                            // self.inner_shapes
-                            // .push(get_rect_shape(left as f32, y as f32));
                         }
                     }
 
@@ -768,14 +730,10 @@ impl PolygonTransform for Polygon {
                         if !visited.contains(&(right, y)) {
                             visited.insert((right, y));
                             buffer.push(get_rect_shape(right as f32, y as f32))
-                            // self.inner_shapes
-                            //     .push(get_rect_shape(right as f32, y as f32));
                         }
                     }
 
-                    // Check upper and lower rows for new seeds
                     let mut add_to_stack = |x, y| {
-                        // Check if the current pixel is within bounds and unvisited
                         let p_check = Pos2 {
                             x: x as f32,
                             y: y as f32,
@@ -785,9 +743,7 @@ impl PolygonTransform for Polygon {
                         }
                     };
 
-                    // Check the region around the filled row to find unfilled pixels
                     for dy in (-1..=1).step_by(2) {
-                        // Check one row above, one below, and the current row
                         for dx in left..=right {
                             add_to_stack(dx, y + dy);
                         }
@@ -896,33 +852,3 @@ fn is_inside(polygon: &[Pos2], point: Pos2) -> bool {
 
     crossings % 2 != 0
 }
-
-// // Функция для вычисления расстояния от точки до отрезка
-// fn distance_point_to_segment(p: Pos2, a: Pos2, b: Pos2) -> f32 {
-//     let ab = Pos2 {
-//         x: b.x - a.x,
-//         y: b.y - a.y,
-//     };
-//     let ap = Pos2 {
-//         x: p.x - a.x,
-//         y: p.y - a.y,
-//     };
-//     let bp = Pos2 {
-//         x: p.x - b.x,
-//         y: p.y - b.y,
-//     };
-//
-//     let dot1 = ab.x * ap.x + ab.y * ap.y;
-//     let dot2 = ab.x * bp.x + ab.y * bp.y;
-//
-//     if dot1 <= 0.0 {
-//         return ((p.x - a.x).powi(2) + (p.y - a.y).powi(2)).sqrt();
-//     }
-//     if dot2 >= 0.0 {
-//         return ((p.x - b.x).powi(2) + (p.y - b.y).powi(2)).sqrt();
-//     }
-//
-//     let cross = ab.x * ap.y - ab.y * ap.x;
-//     (cross.abs() / ((b.x - a.x).hypot(b.y - a.y))).abs()
-// }
-//
